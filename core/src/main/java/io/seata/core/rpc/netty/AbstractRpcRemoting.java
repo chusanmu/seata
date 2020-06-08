@@ -145,10 +145,12 @@ public abstract class AbstractRpcRemoting implements Disposable {
      * Init.
      */
     public void init() {
+        // TODO: 定时检查messageFuture 是否过期
         timerExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
                 for (Map.Entry<Integer, MessageFuture> entry : futures.entrySet()) {
+                    // TODO: 如果超时了，直接进行一个移除
                     if (entry.getValue().isTimeout()) {
                         futures.remove(entry.getKey());
                         entry.getValue().setResultMessage(null);
