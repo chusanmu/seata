@@ -16,6 +16,7 @@
 package io.seata.core.protocol;
 
 /**
+ * type code 接口，类似于策略模式
  * @author zhangsen
  */
 public interface MessageTypeAware {

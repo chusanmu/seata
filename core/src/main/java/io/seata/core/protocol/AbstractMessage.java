@@ -26,7 +26,7 @@ import java.nio.charset.Charset;
 
 /**
  * The type Abstract message.
- *
+ * TODO： 定义的一个抽象的message
  * @author slievrly
  */
 public abstract class AbstractMessage implements MessageTypeAware, Serializable {

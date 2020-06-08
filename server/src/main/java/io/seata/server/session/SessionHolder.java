@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import com.sun.xml.internal.bind.v2.TODO;
 import io.seata.common.exception.ShouldNeverHappenException;
 import io.seata.common.exception.StoreException;
 import io.seata.common.loader.EnhancedServiceLoader;
@@ -84,7 +85,9 @@ public class SessionHolder {
         }
         StoreMode storeMode = StoreMode.get(mode);
         if (StoreMode.DB.equals(storeMode)) {
+            // TODO: 这里会把DataBaseSessionManager load进来
             ROOT_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName());
+            // TODO: 注意这里Load了多个进来的
             ASYNC_COMMITTING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName(),
                 new Object[] {ASYNC_COMMITTING_SESSION_MANAGER_NAME});
             RETRY_COMMITTING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName(),
@@ -92,8 +95,10 @@ public class SessionHolder {
             RETRY_ROLLBACKING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName(),
                 new Object[] {RETRY_ROLLBACKING_SESSION_MANAGER_NAME});
         } else if (StoreMode.FILE.equals(storeMode)) {
+            // TODO: 如果是File模式，这里会把FileSessionManager load进来
             String sessionStorePath = CONFIG.getConfig(ConfigurationKeys.STORE_FILE_DIR,
                 DEFAULT_SESSION_STORE_FILE_DIR);
+            // TODO: 把sessionStorePath拿到，如果为空，抛出异常
             if (StringUtils.isBlank(sessionStorePath)) {
                 throw new StoreException("the {store.file.dir} is empty.");
             }
@@ -124,6 +129,7 @@ public class SessionHolder {
      * Reload.
      */
     protected static void reload() {
+        // TODO: 如果是reloadable类型的
         if (ROOT_SESSION_MANAGER instanceof Reloadable) {
             ((Reloadable)ROOT_SESSION_MANAGER).reload();
 

@@ -17,6 +17,7 @@ package io.seata.core.serializer;
 
 /**
  * The enum serialize type.
+ * 序列化方式类
  *
  * @author leizhiyuan
  */

@@ -19,7 +19,7 @@ import java.io.Serializable;
 
 /**
  * The type Register tm request.
- *
+ * 注册tm请求
  * @author slievrly
  */
 public class RegisterTMRequest extends AbstractIdentifyRequest implements Serializable {

@@ -31,9 +31,11 @@ public class SeataAutoDataSourceProxyAdvice implements MethodInterceptor, Introd
 
     @Override
     public Object invoke(MethodInvocation invocation) throws Throwable {
+        // TODO: 代理数据源，这地方玩的很高级
         DataSourceProxy dataSourceProxy = DataSourceProxyHolder.get().putDataSource((DataSource) invocation.getThis());
         Method method = invocation.getMethod();
         Object[] args = invocation.getArguments();
+        // TODO: 如果能在DataSourceProxy中找到 目标方法，则执行DataSourceProxy中的method, 否则执行原始method
         Method m = BeanUtils.findDeclaredMethod(DataSourceProxy.class, method.getName(), method.getParameterTypes());
         if (null != m) {
             return m.invoke(dataSourceProxy, args);
@@ -42,6 +44,10 @@ public class SeataAutoDataSourceProxyAdvice implements MethodInterceptor, Introd
         }
     }
 
+    /**
+     * 让被seata自动代理的bean拥有SeataProxy标识接口
+     * @return
+     */
     @Override
     public Class<?>[] getInterfaces() {
         return new Class[]{SeataProxy.class};

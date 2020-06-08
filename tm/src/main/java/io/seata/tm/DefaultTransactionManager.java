@@ -39,7 +39,8 @@ import io.seata.core.rpc.netty.TmRpcClient;
 
 /**
  * The type Default transaction manager.
- *
+ * TODO: 默认的TM管理器，控制全局的开启事务，提交事务，以及回滚事务
+ * 这里发送的请求，都是带有响应的，也就是同步发起请求吧
  * @author sharajava
  */
 public class DefaultTransactionManager implements TransactionManager {
@@ -50,6 +51,7 @@ public class DefaultTransactionManager implements TransactionManager {
         GlobalBeginRequest request = new GlobalBeginRequest();
         request.setTransactionName(name);
         request.setTimeout(timeout);
+        // TODO: 发起一个提交全局事务的请求
         GlobalBeginResponse response = (GlobalBeginResponse)syncCall(request);
         if (response.getResultCode() == ResultCode.Failed) {
             throw new TmTransactionException(TransactionExceptionCode.BeginFailed, response.getMsg());

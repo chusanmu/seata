@@ -19,6 +19,7 @@ import java.util.List;
 
 /**
  * The interface Load balance.
+ * TODO: 负载均衡器接口
  *
  * @author slievrly
  */
@@ -26,6 +27,7 @@ public interface LoadBalance {
 
     /**
      * Select t.
+     * TODO: 负载均衡器 从list中挑选出来一个实例
      *
      * @param <T>      the type parameter
      * @param invokers the invokers

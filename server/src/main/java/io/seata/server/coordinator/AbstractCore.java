@@ -65,12 +65,28 @@ public abstract class AbstractCore implements Core {
 
     public abstract BranchType getHandleBranchType();
 
+    /**
+     * 注册分支事务
+     * @param branchType the branch type
+     * @param resourceId the resource id
+     * @param clientId   the client id
+     * @param xid        the xid
+     * @param applicationData the context
+     * @param lockKeys   the lock keys
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public Long branchRegister(BranchType branchType, String resourceId, String clientId, String xid,
                                String applicationData, String lockKeys) throws TransactionException {
+        // TODO: 根据xid查出来一个全局事务session, 然后断言它不能为空，如果为空 则抛出异常.
         GlobalSession globalSession = assertGlobalSessionNotNull(xid, false);
+        /*这段代码会在 加锁中间执行 是线程安全的**/
         return SessionHolder.lockAndExecute(globalSession, () -> {
+            // TODO: 这段代码是被加锁了的，所以是线程安全的,
+            // 全局session状态检查
             globalSessionStatusCheck(globalSession);
+
             globalSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
             BranchSession branchSession = SessionHelper.newBranchByGlobal(globalSession, branchType, resourceId,
                     applicationData, lockKeys, clientId);
@@ -92,11 +108,13 @@ public abstract class AbstractCore implements Core {
     }
 
     protected void globalSessionStatusCheck(GlobalSession globalSession) throws GlobalTransactionException {
+        // TODO: 如果当前globalSession不是激活状态的，那还注册个鸡毛， 直接抛异常
         if (!globalSession.isActive()) {
             throw new GlobalTransactionException(GlobalTransactionNotActive, String.format(
                 "Could not register branch into global session xid = %s status = %s, cause by globalSession not active",
                 globalSession.getXid(), globalSession.getStatus()));
         }
+        // TODO: 如果全局session不是开始状态，也不用继续往下走了，抛异常呗
         if (globalSession.getStatus() != GlobalStatus.Begin) {
             throw new GlobalTransactionException(GlobalTransactionStatusInvalid, String
                     .format("Could not register branch into global session xid = %s status = %s while expecting %s",

@@ -148,6 +148,7 @@ public abstract class AbstractRpcRemotingClient extends AbstractRpcRemoting impl
 
     @Override
     public Object sendMsgWithResponse(Object msg, long timeout) throws TimeoutException {
+        // TODO: 拿到TC的address
         String validAddress = loadBalance(getTransactionServiceGroup());
         Channel channel = clientChannelManager.acquireChannel(validAddress);
         Object result = super.sendAsyncRequestWithResponse(validAddress, channel, msg, timeout);
@@ -170,8 +171,15 @@ public abstract class AbstractRpcRemotingClient extends AbstractRpcRemoting impl
         super.defaultSendResponse(request, clientChannelManager.acquireChannel(serverAddress), msg);
     }
 
+    /**
+     * TODO: 注册处理器，key requestCode, 保存到一个自定义的Pair对象中
+     * @param requestCode
+     * @param processor   {@link RemotingProcessor}
+     * @param executor    thread pool
+     */
     @Override
     public void registerProcessor(int requestCode, RemotingProcessor processor, ExecutorService executor) {
+        // TODO: 保存处理器，和执行它的线程池
         Pair<RemotingProcessor, ExecutorService> pair = new Pair<>(processor, executor);
         this.processorTable.put(requestCode, pair);
     }

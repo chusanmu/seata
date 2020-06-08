@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Template of executing business logic with a global transaction.
- *
+ * TODO: 执行事务的一个模板
  * @author sharajava
  */
 public class TransactionalTemplate {
@@ -49,25 +49,33 @@ public class TransactionalTemplate {
      */
     public Object execute(TransactionalExecutor business) throws Throwable {
         // 1 get transactionInfo
+        // TODO: 第一步，获得事务信息
         TransactionInfo txInfo = business.getTransactionInfo();
         if (txInfo == null) {
             throw new ShouldNeverHappenException("transactionInfo does not exist");
         }
         // 1.1 get or create a transaction
+        // TODO: 然后获得或者创建一个全局事务
         GlobalTransaction tx = GlobalTransactionContext.getCurrentOrCreate();
 
         // 1.2 Handle the Transaction propatation and the branchType
+        // TODO: 处理隔离级别
         Propagation propagation = txInfo.getPropagation();
         SuspendedResourcesHolder suspendedResourcesHolder = null;
         try {
+            // TODO: 处理传播机制，这段代码，个人认为，可以抽成一个方法
+
             switch (propagation) {
                 case NOT_SUPPORTED:
+                    // TODO: 如果不支持事务，则直接释放掉xid就Ok了
                     suspendedResourcesHolder = tx.suspend(true);
                     return business.execute();
                 case REQUIRES_NEW:
+                    // TODO: 如果需要一个新的，也直接释放掉xid
                     suspendedResourcesHolder = tx.suspend(true);
                     break;
                 case SUPPORTS:
+                    // TODO: 如果不存在事务，则不新建，不存在就不存在吧，直接去执行业务逻辑
                     if (!existingTransaction()) {
                         return business.execute();
                     }
@@ -75,14 +83,17 @@ public class TransactionalTemplate {
                 case REQUIRED:
                     break;
                 case NEVER:
+                    // TODO: 存在事务, 则 抛个异常
                     if (existingTransaction()) {
                         throw new TransactionException(
                                 String.format("Existing transaction found for transaction marked with propagation 'never',xid = %s"
                                         ,RootContext.getXID()));
                     } else {
+                        // TODO: 不存在则，执行业务逻辑去
                         return business.execute();
                     }
                 case MANDATORY:
+                    // TODO: 不存在事务，直接抛出异常
                     if (!existingTransaction()) {
                         throw new TransactionException("No existing transaction found for transaction marked with propagation 'mandatory'");
                     }
@@ -94,7 +105,7 @@ public class TransactionalTemplate {
 
             try {
 
-                // 2. begin transaction
+                // 2. begin transaction 开启事务
                 beginTransaction(txInfo, tx);
 
                 Object rs = null;

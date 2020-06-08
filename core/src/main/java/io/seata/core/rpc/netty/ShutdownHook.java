@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * ensure the shutdownHook is singleton
+ * TODO: 定义的一个关闭钩子 注释的是要保证单例
  *
  * @author 563868273@qq.com
  */
@@ -34,17 +35,31 @@ public class ShutdownHook extends Thread {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ShutdownHook.class);
 
+
+    /**
+     * 直接new 一个钩子，private 的，饿汉单例模式
+     */
     private static final ShutdownHook SHUTDOWN_HOOK = new ShutdownHook("ShutdownHook");
 
+    /**
+     * 需要进行关闭的一个集合
+     */
     private Set<Disposable> disposables = new TreeSet<>();
 
+    /**
+     * 原子操作类
+     */
     private final AtomicBoolean destroyed = new AtomicBoolean(false);
 
     /**
      * default 10. Lower values have higher priority
+     * 默认的优先级
      */
     private static final int DEFAULT_PRIORITY = 10;
 
+    /**
+     * 静态，在关闭Jvm的时候 会回调钩子
+     */
     static {
         Runtime.getRuntime().addShutdownHook(SHUTDOWN_HOOK);
     }
@@ -57,27 +72,46 @@ public class ShutdownHook extends Thread {
         return SHUTDOWN_HOOK;
     }
 
+    /**
+     * 添加一个要关闭的东东
+     * @param disposable
+     */
     public void addDisposable(Disposable disposable) {
         addDisposable(disposable, DEFAULT_PRIORITY);
     }
 
+    /**
+     * 添加一个可以指定优先级的钩子
+     * @param disposable
+     * @param priority
+     */
     public void addDisposable(Disposable disposable, int priority) {
+        // TODO: 又进行包了一层，可以进行优先级比较
         disposables.add(new DisposablePriorityWrapper(disposable, priority));
     }
 
+    /**
+     * 开始调用关闭方法呗
+     */
     @Override
     public void run() {
         destroyAll();
     }
 
+
+    /**
+     * 关闭注册的所有的东东
+     */
     public void destroyAll() {
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("destoryAll starting");
         }
+        // TODO: 这地方有意思，需要保证原子性判断，然后如果为空的话，直接给return掉就好了呗
         if (!destroyed.compareAndSet(false, true) && CollectionUtils.isEmpty(disposables)) {
             return;
         }
+        // TODO: for循环destroy
         for (Disposable disposable : disposables) {
             disposable.destroy();
         }
@@ -85,6 +119,7 @@ public class ShutdownHook extends Thread {
 
     /**
      * for spring context
+     * 移除钩子
      */
     public static void removeRuntimeShutdownHook() {
         Runtime.getRuntime().removeShutdownHook(SHUTDOWN_HOOK);

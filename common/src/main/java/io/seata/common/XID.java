@@ -17,6 +17,8 @@ package io.seata.common;
 
 /**
  * The type Xid.
+ * TODO: 全局事务ID，里面其实就是一个
+ * TODO: IP加Port加tranId
  *
  * @author slievrly
  */

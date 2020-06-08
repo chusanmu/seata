@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.sun.xml.internal.bind.v2.TODO;
 import io.netty.channel.Channel;
 import io.seata.common.thread.NamedThreadFactory;
 import io.seata.common.util.CollectionUtils;
@@ -66,6 +67,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * TODO: 默认的TC协调器，监听处理一系列的事件
+ * 包括：
+ * 1.全局事务开启
+ * 2.全局事务回滚
+ * 3.全局事务提交
+ * 4.全局报告
+ * 5.分支注册
+ * 6.分支提交
+ * 7.分支报告 等等...
  * The type Default coordinator.
  */
 public class DefaultCoordinator extends AbstractTCInboundHandler implements TransactionMessageHandler, Disposable {
@@ -113,29 +123,56 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
     private static final Duration MAX_COMMIT_RETRY_TIMEOUT = ConfigurationFactory.getInstance().getDuration(
         ConfigurationKeys.MAX_COMMIT_RETRY_TIMEOUT, DurationUtil.DEFAULT_DURATION, 100);
 
+
     private static final Duration MAX_ROLLBACK_RETRY_TIMEOUT = ConfigurationFactory.getInstance().getDuration(
         ConfigurationKeys.MAX_ROLLBACK_RETRY_TIMEOUT, DurationUtil.DEFAULT_DURATION, 100);
 
     private static final boolean ROLLBACK_RETRY_TIMEOUT_UNLOCK_ENABLE = ConfigurationFactory.getInstance().getBoolean(
         ConfigurationKeys.ROLLBACK_RETRY_TIMEOUT_UNLOCK_ENABLE, false);
 
+    /* ---------------- 实例化一系列的线程池 -------------- */
+    /* ---------------- 默认核心线程都是1个 -------------- */
+
+
+    /**
+     * 重试回滚
+     */
     private ScheduledThreadPoolExecutor retryRollbacking = new ScheduledThreadPoolExecutor(1,
         new NamedThreadFactory("RetryRollbacking", 1));
 
+    /**
+     * 重试提交
+     */
     private ScheduledThreadPoolExecutor retryCommitting = new ScheduledThreadPoolExecutor(1,
         new NamedThreadFactory("RetryCommitting", 1));
 
+    /**
+     * 异步提交
+     */
     private ScheduledThreadPoolExecutor asyncCommitting = new ScheduledThreadPoolExecutor(1,
         new NamedThreadFactory("AsyncCommitting", 1));
 
+    /**
+     * 超时检查
+     */
     private ScheduledThreadPoolExecutor timeoutCheck = new ScheduledThreadPoolExecutor(1,
         new NamedThreadFactory("TxTimeoutCheck", 1));
 
+    /**
+     * undoLogDelete检查
+     */
     private ScheduledThreadPoolExecutor undoLogDelete = new ScheduledThreadPoolExecutor(1,
         new NamedThreadFactory("UndoLogDelete", 1));
 
+
+    /**
+     * TODO: 这里就是rpcServer了
+     */
     private ServerMessageSender messageSender;
 
+    /**
+     * TODO: 这里非常重要，基本上所有的事件 都是委托给core去处理的
+     */
     private DefaultCore core;
 
     private EventBus eventBus = EventBusManager.get();
@@ -146,15 +183,26 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
      * @param messageSender the message sender
      */
     public DefaultCoordinator(ServerMessageSender messageSender) {
+        // TODO: 将rpcServer赋值给messageSender
         this.messageSender = messageSender;
+        // TODO: 再将rpcServer传到DefaultCore中
         this.core = new DefaultCore(messageSender);
     }
 
+    /**
+     * TODO: 全局事务开启
+     * @param request    the request
+     * @param response   the response
+     * @param rpcContext the rpc context
+     * @throws TransactionException
+     */
     @Override
     protected void doGlobalBegin(GlobalBeginRequest request, GlobalBeginResponse response, RpcContext rpcContext)
         throws TransactionException {
+        // TODO: 调用core去实现 开启全局事务，然后返回一个xid, 设置到响应中
         response.setXid(core.begin(rpcContext.getApplicationId(), rpcContext.getTransactionServiceGroup(),
             request.getTransactionName(), request.getTimeout()));
+        // TODO: 打印开启全局事务 成功的日志信息
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Begin new global transaction applicationId: {},transactionServiceGroup: {}, transactionName: {},timeout:{},xid:{}",
                 rpcContext.getApplicationId(), rpcContext.getTransactionServiceGroup(), request.getTransactionName(), request.getTimeout(), response.getXid());
@@ -188,6 +236,7 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
     @Override
     protected void doBranchRegister(BranchRegisterRequest request, BranchRegisterResponse response,
                                     RpcContext rpcContext) throws TransactionException {
+        // TODO: 使用core去注册一个分支
         response.setBranchId(
             core.branchRegister(request.getBranchType(), request.getResourceId(), rpcContext.getClientId(),
                 request.getXid(), request.getApplicationData(), request.getLockKey()));
@@ -372,7 +421,7 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
     }
 
     /**
-     * Init.
+     * Init. 初始化方法. 进行一系列的任务调度
      */
     public void init() {
         retryRollbacking.scheduleAtFixedRate(() -> {
@@ -435,14 +484,19 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
 
     }
 
+    /**
+     * TODO: 关闭方法，会被钩子关闭
+     */
     @Override
     public void destroy() {
         // 1. first shutdown timed task
+        // TODO: 第一步关闭线程池，这里采用的是shutdown(), 意思是等待线程任务完成之后，才进行关闭线程池
         retryRollbacking.shutdown();
         retryCommitting.shutdown();
         asyncCommitting.shutdown();
         timeoutCheck.shutdown();
         try {
+            // TODO: 这里各个线程池都进行了等待几秒的操作，
             retryRollbacking.awaitTermination(TIMED_TASK_SHUTDOWN_MAX_WAIT_MILLS, TimeUnit.MILLISECONDS);
             retryCommitting.awaitTermination(TIMED_TASK_SHUTDOWN_MAX_WAIT_MILLS, TimeUnit.MILLISECONDS);
             asyncCommitting.awaitTermination(TIMED_TASK_SHUTDOWN_MAX_WAIT_MILLS, TimeUnit.MILLISECONDS);

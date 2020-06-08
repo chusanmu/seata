@@ -25,6 +25,8 @@ import io.seata.tm.api.transaction.TransactionInfo;
 
 /**
  * The interface Global transactional.
+ * TODO: 全局 事务注解
+ * @author
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD,ElementType.TYPE})

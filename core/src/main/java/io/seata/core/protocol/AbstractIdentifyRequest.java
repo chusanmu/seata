@@ -18,23 +18,26 @@ package io.seata.core.protocol;
 
 /**
  * The type Abstract identify request.
- *
+ * TODO: 摘要识别请求，
  * @author sharajava
  */
 public abstract class AbstractIdentifyRequest extends AbstractMessage {
 
     /**
      * The Version.
+     * TODO: 当前版本号
      */
     protected String version = Version.CURRENT;
 
     /**
      * The Application id.
+     * TODO: 当前应用ID
      */
     protected String applicationId;
 
     /**
      * The Transaction service group.
+     * TODO: 事务组
      */
     protected String transactionServiceGroup;
 
