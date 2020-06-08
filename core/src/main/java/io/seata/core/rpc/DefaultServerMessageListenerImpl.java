@@ -145,6 +145,7 @@ public class DefaultServerMessageListenerImpl implements ServerMessageListener {
                 }
             }
         } catch (Exception exx) {
+            // TODO: 发送异常，标识isSuccess为false
             isSuccess = false;
             LOGGER.error(exx.getMessage());
         }
