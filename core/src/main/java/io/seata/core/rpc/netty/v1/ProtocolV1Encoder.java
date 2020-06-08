@@ -88,6 +88,7 @@ public class ProtocolV1Encoder extends MessageToByteEncoder {
                 }
 
                 byte[] bodyBytes = null;
+                // TODO: 如果消息类型不是心跳请求 也不是 心跳响应，则解析body
                 if (messageType != ProtocolConstants.MSGTYPE_HEARTBEAT_REQUEST
                         && messageType != ProtocolConstants.MSGTYPE_HEARTBEAT_RESPONSE) {
                     // heartbeat has no body
@@ -103,11 +104,13 @@ public class ProtocolV1Encoder extends MessageToByteEncoder {
                 }
 
                 // fix fullLength and headLength
+                // TODO: 这地方的意思就是，刚开始不能确定数据包总长度，所以fullLength是个空位，然后这地方移动指针，重新设置填充fullLength
                 int writeIndex = out.writerIndex();
                 // skip magic code(2B) + version(1B)
                 out.writerIndex(writeIndex - fullLength + 3);
                 out.writeInt(fullLength);
                 out.writeShort(headLength);
+                // TODO: 填充完毕，再把writeIndex放回去
                 out.writerIndex(writeIndex);
             } else {
                 throw new UnsupportedOperationException("Not support this class:" + msg.getClass());

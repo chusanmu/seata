@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SerializerFactory {
 
     /**
-     * The constant CODEC_MAP.
+     * The constant CODEC_MAP. 每一种序列化类型，对应一个序列化器
      */
     protected static final Map<SerializerType, Serializer> CODEC_MAP = new ConcurrentHashMap<SerializerType, Serializer>();
 
@@ -40,6 +40,7 @@ public class SerializerFactory {
      */
     public static Serializer getSerializer(byte serializeCode) {
         SerializerType serializerType = SerializerType.getByCode(serializeCode);
+        // TODO: 首先本地加载，如果没有，进行全局Loader
         if (CODEC_MAP.get(serializerType) != null) {
             return CODEC_MAP.get(serializerType);
         }

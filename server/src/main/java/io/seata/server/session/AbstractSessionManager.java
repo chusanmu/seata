@@ -39,6 +39,7 @@ public abstract class AbstractSessionManager implements SessionManager, SessionL
 
     /**
      * The Transaction store manager.
+     *  TODO: 目前有两种存储事务的模式，1.数据库db 2.文件file
      */
     protected TransactionStoreManager transactionStoreManager;
 
@@ -67,6 +68,7 @@ public abstract class AbstractSessionManager implements SessionManager, SessionL
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("MANAGER[" + name + "] SESSION[" + session + "] " + LogOperation.GLOBAL_ADD);
         }
+        // TODO: 把当前的session存起来
         writeSession(LogOperation.GLOBAL_ADD, session);
     }
 
@@ -112,6 +114,11 @@ public abstract class AbstractSessionManager implements SessionManager, SessionL
         writeSession(LogOperation.BRANCH_REMOVE, branchSession);
     }
 
+    /**
+     * 当开启全局事务的时候，调用本类方法
+     * @param globalSession the global session
+     * @throws TransactionException
+     */
     @Override
     public void onBegin(GlobalSession globalSession) throws TransactionException {
         addGlobalSession(globalSession);
@@ -149,6 +156,7 @@ public abstract class AbstractSessionManager implements SessionManager, SessionL
     }
 
     private void writeSession(LogOperation logOperation, SessionStorable sessionStorable) throws TransactionException {
+        // TODO:
         if (!transactionStoreManager.writeSession(logOperation, sessionStorable)) {
             if (LogOperation.GLOBAL_ADD.equals(logOperation)) {
                 throw new GlobalTransactionException(TransactionExceptionCode.FailedWriteSession,

@@ -81,10 +81,12 @@ public abstract class AbstractRpcRemoting implements Disposable {
 
     /**
      * The Futures.
+     * TODO: 用来存放 请求ID和响应Future，便于根据请求ID来获取异步对应的响应结果
      */
     protected final ConcurrentHashMap<Integer, MessageFuture> futures = new ConcurrentHashMap<>();
     /**
      * The Basket map.
+     *  address ---> blockingQueue<RpcMessage>
      */
     protected final ConcurrentHashMap<String, BlockingQueue<RpcMessage>> basketMap = new ConcurrentHashMap<>();
 
@@ -142,24 +144,25 @@ public abstract class AbstractRpcRemoting implements Disposable {
     }
 
     /**
+     * TODO: 这个类初始化，所要做的事就是检查请求是否有超时的，如果超时则移除，然后把异常信息返回给它
      * Init.
      */
     public void init() {
-        timerExecutor.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                for (Map.Entry<Integer, MessageFuture> entry : futures.entrySet()) {
-                    if (entry.getValue().isTimeout()) {
-                        futures.remove(entry.getKey());
-                        entry.getValue().setResultMessage(null);
-                        if (LOGGER.isDebugEnabled()) {
-                            LOGGER.debug("timeout clear future: {}", entry.getValue().getRequestMessage().getBody());
-                        }
+        // TODO: futures 超时检查器，每隔3秒钟进行一个检查，如果有超时的进行一个移除，然后将结果设置为错误原因
+        timerExecutor.scheduleAtFixedRate(() -> {
+            // TODO: 遍历所有的futures, 如果超时了，从futures中移除
+            for (Map.Entry<Integer, MessageFuture> entry : futures.entrySet()) {
+                if (entry.getValue().isTimeout()) {
+                    futures.remove(entry.getKey());
+                    // 将对应的结果设置为null
+                    entry.getValue().setResultMessage(null);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("timeout clear future: {}", entry.getValue().getRequestMessage().getBody());
                     }
                 }
-
-                nowMills = System.currentTimeMillis();
             }
+
+            nowMills = System.currentTimeMillis();
         }, TIMEOUT_CHECK_INTERNAL, TIMEOUT_CHECK_INTERNAL, TimeUnit.MILLISECONDS);
     }
 
@@ -196,9 +199,11 @@ public abstract class AbstractRpcRemoting implements Disposable {
      */
     protected Object sendAsyncRequestWithResponse(String address, Channel channel, Object msg, long timeout) throws
         TimeoutException {
+        // TODO: timeout 小于等于0，肯定要报错了
         if (timeout <= 0) {
             throw new FrameworkException("timeout should more than 0ms");
         }
+        // TODO: 核心方法
         return sendAsyncRequest(address, channel, msg, timeout);
     }
 
@@ -215,12 +220,22 @@ public abstract class AbstractRpcRemoting implements Disposable {
         return sendAsyncRequest(null, channel, msg, 0);
     }
 
+    /**
+     * 发送异步请求，核心方法，重中之重
+     * @param address
+     * @param channel
+     * @param msg
+     * @param timeout
+     * @return
+     * @throws TimeoutException
+     */
     private Object sendAsyncRequest(String address, Channel channel, Object msg, long timeout)
         throws TimeoutException {
         if (channel == null) {
             LOGGER.warn("sendAsyncRequestWithResponse nothing, caused by null channel.");
             return null;
         }
+        // TODO: 构建一个RpcMessage
         final RpcMessage rpcMessage = new RpcMessage();
         rpcMessage.setId(getNextMessageId());
         rpcMessage.setMessageType(ProtocolConstants.MSGTYPE_RESQUEST_ONEWAY);
@@ -228,28 +243,42 @@ public abstract class AbstractRpcRemoting implements Disposable {
         rpcMessage.setCompressor(ProtocolConstants.CONFIGURED_COMPRESSOR);
         rpcMessage.setBody(msg);
 
+        /**
+         * TODO: 构建一个响应messageFuture
+         */
         final MessageFuture messageFuture = new MessageFuture();
+        // 把request message 放进去
         messageFuture.setRequestMessage(rpcMessage);
+        // 设置超时时间
         messageFuture.setTimeout(timeout);
+        // 把rpcMessageId , 响应future放到futuresMap中
         futures.put(rpcMessage.getId(), messageFuture);
 
+        /**
+         * TODO: 如果地址不为空，并且开启了客户端批量发送
+         */
         if (address != null) {
             /*
             The batch send.
             Object From big to small: RpcMessage -> MergedWarpMessage -> AbstractMessage
             @see AbstractRpcRemotingClient.MergedSendRunnable
+                TODO: NettyClientConfig.isEnableClientBatchSendRequest()默认为true
             */
             if (NettyClientConfig.isEnableClientBatchSendRequest()) {
+                // TODO: 把basketMap赋值给局部变量map, 然后从map中根据address取出blockQueue
                 ConcurrentHashMap<String, BlockingQueue<RpcMessage>> map = basketMap;
                 BlockingQueue<RpcMessage> basket = map.get(address);
+                // TODO: 如果为空，存一个新的进去，然后再拿出来
                 if (basket == null) {
                     map.putIfAbsent(address, new LinkedBlockingQueue<>());
                     basket = map.get(address);
                 }
+                // 然后把消息添加进basket中去
                 basket.offer(rpcMessage);
                 if (LOGGER.isDebugEnabled()) {
                     LOGGER.debug("offer message: {}", rpcMessage.getBody());
                 }
+                // 如果未发送，则唤醒等待线程进行发送
                 if (!isSending) {
                     synchronized (mergeLock) {
                         mergeLock.notifyAll();
@@ -263,8 +292,11 @@ public abstract class AbstractRpcRemoting implements Disposable {
                 }
             }
         } else {
+            // TODO: 发送单个请求
             sendSingleRequest(channel, msg, rpcMessage);
         }
+        /* ---------------- 开始等待异步响应 -------------- */
+        // TODO: 如果设置等待时间了，等待超时时间，获取异步返回的结果
         if (timeout > 0) {
             try {
                 return messageFuture.get(timeout, TimeUnit.MILLISECONDS);
@@ -283,16 +315,21 @@ public abstract class AbstractRpcRemoting implements Disposable {
 
     private void sendSingleRequest(Channel channel, Object msg, RpcMessage rpcMessage) {
         ChannelFuture future;
+        // TODO: 检查channel是否可写
         channelWritableCheck(channel, msg);
+        // 可写 ，使用channel将message刷出去
         future = channel.writeAndFlush(rpcMessage);
         future.addListener(new ChannelFutureListener() {
             @Override
             public void operationComplete(ChannelFuture future) {
+                // TODO: 如果没有写成功
                 if (!future.isSuccess()) {
+                    // 把请求id从futures中移除，并且future不为空的话，把异常结果设置到result中
                     MessageFuture messageFuture = futures.remove(rpcMessage.getId());
                     if (messageFuture != null) {
                         messageFuture.setResultMessage(future.cause());
                     }
+                    // TODO: 最后销毁这个channel
                     destroyChannel(future.channel());
                 }
             }
@@ -327,38 +364,58 @@ public abstract class AbstractRpcRemoting implements Disposable {
 
     /**
      * Default Send response.
-     *
+     * TODO: 默认发送响应
      * @param request the msg id
      * @param channel the channel
      * @param msg     the msg
      */
     protected void defaultSendResponse(RpcMessage request, Channel channel, Object msg) {
         RpcMessage rpcMessage = new RpcMessage();
+        // TODO: 如果当前msg是心跳请求message，则响应类型为心跳响应，否则为msg_response
         rpcMessage.setMessageType(msg instanceof HeartbeatMessage ?
             ProtocolConstants.MSGTYPE_HEARTBEAT_RESPONSE :
             ProtocolConstants.MSGTYPE_RESPONSE);
-        rpcMessage.setCodec(request.getCodec()); // same with request
+        // same with request
+        // TODO: 编解码和request请求一样
+        rpcMessage.setCodec(request.getCodec());
+        // TODO: 压缩码和请求的一样
         rpcMessage.setCompressor(request.getCompressor());
+        // TODO: 设置响应体
         rpcMessage.setBody(msg);
+        // 设置响应的消息id，和request.getId是一样的
         rpcMessage.setId(request.getId());
+        // TODO: 检查channel是否可写
         channelWritableCheck(channel, msg);
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("send response:" + rpcMessage.getBody() + ",channel:" + channel);
         }
+        // 发送响应
         channel.writeAndFlush(rpcMessage);
     }
 
+
+    /**
+     * TODO: 检查channel是否可写
+     * @param channel
+     * @param msg
+     */
     private void channelWritableCheck(Channel channel, Object msg) {
+        // 重试次数
         int tryTimes = 0;
+        // TODO: 这里加锁，个人感觉是，可能会有多个线程同时检查一个channel是否可写， 如果一个线程检查可写了，然后进行写入，此时，另外的线程是需要等待的
         synchronized (lock) {
             while (!channel.isWritable()) {
                 try {
                     tryTimes++;
+                    // 判断重试次数 是否大于 配置的重试次数，如果大于了
                     if (tryTimes > NettyClientConfig.getMaxNotWriteableRetry()) {
+                        // 销毁channel
                         destroyChannel(channel);
+                        // 抛个异常，当前channel不可写
                         throw new FrameworkException("msg:" + ((msg == null) ? "null" : msg.toString()),
                             FrameworkErrorCode.ChannelIsNotWritable);
                     }
+                    // TODO 等待几秒钟，继续检查, 这里注意，采用的是lock.wait(); 表示其他线程是可以获得锁，然后进行判断channel读写状态的
                     lock.wait(NOT_WRITEABLE_CHECK_MILLS);
                 } catch (InterruptedException exx) {
                     LOGGER.error(exx.getMessage());
@@ -435,6 +492,7 @@ public abstract class AbstractRpcRemoting implements Disposable {
 
     /**
      * Rpc message processing.
+     * TODO: 处理rpc Message
      *
      * @param ctx        Channel handler context.
      * @param rpcMessage rpc message.
@@ -445,23 +503,31 @@ public abstract class AbstractRpcRemoting implements Disposable {
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(String.format("%s msgId:%s, body:%s", this, rpcMessage.getId(), rpcMessage.getBody()));
         }
+        // TODO: 拿到message请求体
         Object body = rpcMessage.getBody();
         if (body instanceof MessageTypeAware) {
+            // TODO: 如果是MessageTypeAware类型的，则进行一个强转
             MessageTypeAware messageTypeAware = (MessageTypeAware) body;
+            // 从processorTable中根据typeCode拿到 处理器和执行它的线程池
             final Pair<RemotingProcessor, ExecutorService> pair = this.processorTable.get((int) messageTypeAware.getTypeCode());
             if (pair != null) {
+                // TODO: 线程池不为空，利用线程池去执行
                 if (pair.getSecond() != null) {
                     try {
                         pair.getSecond().execute(() -> {
                             try {
+                                // TODO: 执行RemotingProcessor的process方法
                                 pair.getFirst().process(ctx, rpcMessage);
                             } catch (Throwable th) {
                                 LOGGER.error(FrameworkErrorCode.NetDispatch.getErrCode(), th.getMessage(), th);
                             }
                         });
+                        // TODO: 这里catch住线程池拒绝异常，表示队列已满，已到最大线程数
                     } catch (RejectedExecutionException e) {
+                        // TODO: 打印错误日志
                         LOGGER.error(FrameworkErrorCode.ThreadPoolFull.getErrCode(),
                             "thread pool is full, current max pool size is " + messageExecutor.getActiveCount());
+                        // TODO: 如果开启了打印堆栈信息，则打印
                         if (allowDumpStack) {
                             String name = ManagementFactory.getRuntimeMXBean().getName();
                             String pid = name.split("@")[0];
@@ -475,6 +541,7 @@ public abstract class AbstractRpcRemoting implements Disposable {
                         }
                     }
                 } else {
+                    // 没有线程池，则直接进行调用 处理
                     try {
                         pair.getFirst().process(ctx, rpcMessage);
                     } catch (Throwable th) {
@@ -491,6 +558,7 @@ public abstract class AbstractRpcRemoting implements Disposable {
 
     /**
      * The type AbstractHandler.
+     * TODO: 一个很重要的内部类，extends 了 ChannelDuplexHandler
      */
     @Deprecated
     abstract class AbstractHandler extends ChannelDuplexHandler {
@@ -514,27 +582,35 @@ public abstract class AbstractRpcRemoting implements Disposable {
             ctx.fireChannelWritabilityChanged();
         }
 
+        /**
+         * TODO: 负责处理读事件
+         * @param ctx
+         * @param msg
+         * @throws Exception
+         */
         @Override
         public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
+            // TODO: 如果msg为 RPCMessage 才进行处理
             if (msg instanceof RpcMessage) {
                 final RpcMessage rpcMessage = (RpcMessage) msg;
+                // TODO: 判断消息类型为请求类型
                 if (rpcMessage.getMessageType() == ProtocolConstants.MSGTYPE_RESQUEST
                     || rpcMessage.getMessageType() == ProtocolConstants.MSGTYPE_RESQUEST_ONEWAY) {
                     if (LOGGER.isDebugEnabled()) {
                         LOGGER.debug(String.format("%s msgId:%s, body:%s", this, rpcMessage.getId(), rpcMessage.getBody()));
                     }
                     try {
-                        messageExecutor.execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    dispatch(rpcMessage, ctx);
-                                } catch (Throwable th) {
-                                    LOGGER.error(FrameworkErrorCode.NetDispatch.getErrCode(), th.getMessage(), th);
-                                }
+                        // TODO: 使用messageExecutor 去处理 请求消息
+                        messageExecutor.execute(() -> {
+                            try {
+                                // TODO: 分发消息 去处理，由子类去实现
+                                dispatch(rpcMessage, ctx);
+                            } catch (Throwable th) {
+                                LOGGER.error(FrameworkErrorCode.NetDispatch.getErrCode(), th.getMessage(), th);
                             }
                         });
                     } catch (RejectedExecutionException e) {
+                        // TODO: 如果发生拒绝策略异常，和上面的处理一样
                         LOGGER.error(FrameworkErrorCode.ThreadPoolFull.getErrCode(),
                             "thread pool is full, current max pool size is " + messageExecutor.getActiveCount());
                         if (allowDumpStack) {
@@ -550,24 +626,24 @@ public abstract class AbstractRpcRemoting implements Disposable {
                         }
                     }
                 } else {
+                    // TODO: 不是请求类型，则直接从futures拿出请求 响应
                     MessageFuture messageFuture = futures.remove(rpcMessage.getId());
                     if (LOGGER.isDebugEnabled()) {
                         LOGGER.debug(String
                             .format("%s msgId:%s, future :%s, body:%s", this, rpcMessage.getId(), messageFuture,
                                 rpcMessage.getBody()));
                     }
+                    // TODO: messageFuture不为空，设置响应结果
                     if (messageFuture != null) {
                         messageFuture.setResultMessage(rpcMessage.getBody());
                     } else {
                         try {
-                            messageExecutor.execute(new Runnable() {
-                                @Override
-                                public void run() {
-                                    try {
-                                        dispatch(rpcMessage, ctx);
-                                    } catch (Throwable th) {
-                                        LOGGER.error(FrameworkErrorCode.NetDispatch.getErrCode(), th.getMessage(), th);
-                                    }
+                            // TODO: 如果messageFuture为空，则用线程池 去执行
+                            messageExecutor.execute(() -> {
+                                try {
+                                    dispatch(rpcMessage, ctx);
+                                } catch (Throwable th) {
+                                    LOGGER.error(FrameworkErrorCode.NetDispatch.getErrCode(), th.getMessage(), th);
                                 }
                             });
                         } catch (RejectedExecutionException e) {
@@ -579,6 +655,12 @@ public abstract class AbstractRpcRemoting implements Disposable {
             }
         }
 
+        /**
+         * TODO: 如果发生异常，打印日志，然后销毁channel
+         * @param ctx
+         * @param cause
+         * @throws Exception
+         */
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             LOGGER.error(FrameworkErrorCode.ExceptionCaught.getErrCode(),
@@ -591,6 +673,12 @@ public abstract class AbstractRpcRemoting implements Disposable {
             }
         }
 
+        /**
+         * 关闭channel
+         * @param ctx
+         * @param future
+         * @throws Exception
+         */
         @Override
         public void close(ChannelHandlerContext ctx, ChannelPromise future) throws Exception {
             if (LOGGER.isInfoEnabled()) {

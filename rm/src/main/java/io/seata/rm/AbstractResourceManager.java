@@ -63,7 +63,7 @@ public abstract class AbstractResourceManager implements ResourceManager {
             request.setResourceId(resourceId);
             request.setBranchType(branchType);
             request.setApplicationData(applicationData);
-
+            // TODO: 向TC注册分支，并且返回分支注册的响应
             BranchRegisterResponse response = (BranchRegisterResponse) RmRpcClient.getInstance().sendMsgWithResponse(request);
             if (response.getResultCode() == ResultCode.Failed) {
                 throw new RmTransactionException(response.getTransactionExceptionCode(), String.format("Response[ %s ]", response.getMsg()));

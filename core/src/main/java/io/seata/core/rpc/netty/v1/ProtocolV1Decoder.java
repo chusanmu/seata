@@ -68,7 +68,7 @@ public class ProtocolV1Decoder extends LengthFieldBasedFrameDecoder {
 
     public ProtocolV1Decoder(int maxFrameLength) {
         /*
-        int maxFrameLength,      
+        int maxFrameLength,  最大帧长度为8M
         int lengthFieldOffset,  magic code is 2B, and version is 1B, and then FullLength. so value is 3
         int lengthFieldLength,  FullLength is int(4B). so values is 4
         int lengthAdjustment,   FullLength include all data and read 7 bytes before, so the left length is (FullLength-7). so values is -7
@@ -95,8 +95,10 @@ public class ProtocolV1Decoder extends LengthFieldBasedFrameDecoder {
     }
 
     public Object decodeFrame(ByteBuf frame) {
+        // TODO: 用两个字节表示魔数
         byte b0 = frame.readByte();
         byte b1 = frame.readByte();
+        // TODO: 校验魔数
         if (ProtocolConstants.MAGIC_CODE_BYTES[0] != b0
                 || ProtocolConstants.MAGIC_CODE_BYTES[1] != b1) {
             throw new IllegalArgumentException("Unknown magic code: " + b0 + ", " + b1);
@@ -126,17 +128,24 @@ public class ProtocolV1Decoder extends LengthFieldBasedFrameDecoder {
         }
 
         // read body
+        // TODO: 如果是心跳类型的消息
         if (messageType == ProtocolConstants.MSGTYPE_HEARTBEAT_REQUEST) {
+            // TODO: 如果是心跳请求，直接往body里面放个Ping
             rpcMessage.setBody(HeartbeatMessage.PING);
         } else if (messageType == ProtocolConstants.MSGTYPE_HEARTBEAT_RESPONSE) {
             rpcMessage.setBody(HeartbeatMessage.PONG);
         } else {
+            // TODO: 总长度 - 头长度 为 请求体长度
             int bodyLength = fullLength - headLength;
             if (bodyLength > 0) {
+                // TODO: 先定义指定长度的字节数组
                 byte[] bs = new byte[bodyLength];
+                // TODO: 进行读取
                 frame.readBytes(bs);
+                // TODO: 先进行解压
                 Compressor compressor = CompressorFactory.getCompressor(compressorType);
                 bs = compressor.decompress(bs);
+                // TODO: 再进行反序列化
                 Serializer serializer = SerializerFactory.getSerializer(codecType);
                 rpcMessage.setBody(serializer.deserialize(bs));
             }

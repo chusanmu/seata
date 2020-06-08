@@ -99,17 +99,22 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
 
     @Override
     public Object invoke(final MethodInvocation methodInvocation) throws Throwable {
+        // TODO: 当调用目标代理类的目标方法时，会进行执行调用链，拿到目标类
         Class<?> targetClass =
             methodInvocation.getThis() != null ? AopUtils.getTargetClass(methodInvocation.getThis()) : null;
         Method specificMethod = ClassUtils.getMostSpecificMethod(methodInvocation.getMethod(), targetClass);
         if (null != specificMethod && !specificMethod.getDeclaringClass().equals(Object.class)) {
+            // TODO: 把实际方法拿到
             final Method method = BridgeMethodResolver.findBridgedMethod(specificMethod);
+            // TODO: 判断是否有这俩注解
             final GlobalTransactional globalTransactionalAnnotation =
                 getAnnotation(method, targetClass, GlobalTransactional.class);
             final GlobalLock globalLockAnnotation = getAnnotation(method, targetClass, GlobalLock.class);
+            // TODO: 如果是disable的，每次执行会进行判断的，热更新嘛
             boolean localDisable = disable || (degradeCheck && degradeNum >= degradeCheckAllowTimes);
             if (!localDisable) {
                 if (globalTransactionalAnnotation != null) {
+                    // TODO: 分布式事务执行入口
                     return handleGlobalTransaction(methodInvocation, globalTransactionalAnnotation);
                 } else if (globalLockAnnotation != null) {
                     return handleGlobalLock(methodInvocation);
@@ -220,6 +225,10 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
         return sb.append(")").toString();
     }
 
+    /**
+     * TODO: 配置中心更新值，然后这地方的监听会收到 事件变更
+     * @param event the event
+     */
     @Override
     public void onChangeEvent(ConfigurationChangeEvent event) {
         if (ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION.equals(event.getDataId())) {

@@ -22,16 +22,37 @@ import java.util.Map;
 
 /**
  * The type Rpc message.
- *
+ * TODO: RPC通讯message
  * @author slievrly
  */
 public class RpcMessage {
 
+    /**
+     * message id 消息id
+     */
     private int id;
+    /**
+     * 消息类型
+     */
     private byte messageType;
+
+    /**
+     * 编码类型
+     */
     private byte codec;
+
+    /**
+     * 压缩类型
+     */
     private byte compressor;
+    /**
+     * 请求头map
+     */
     private Map<String, String> headMap = new HashMap<>();
+
+    /**
+     * 请求体
+     */
     private Object body;
 
     /**

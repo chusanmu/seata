@@ -17,7 +17,7 @@ package io.seata.core.model;
 
 /**
  * The enum Branch type.
- *
+ * TODO: 定义了seata目前支持的类型，目前支持了四种类型
  * @author sharajava
  */
 public enum BranchType {

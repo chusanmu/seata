@@ -50,6 +50,9 @@ public class DefaultCore implements Core {
 
     private EventBus eventBus = EventBusManager.get();
 
+    /**
+     * TODO: 缓存目前seata支持的几种模式
+     */
     private static Map<BranchType, AbstractCore> coreMap = new ConcurrentHashMap<>();
 
     /**
@@ -58,6 +61,7 @@ public class DefaultCore implements Core {
      * @param messageSender the message sender
      */
     public DefaultCore(ServerMessageSender messageSender) {
+        // TODO: 把继承了 AbstractCore的实现，全loader进来，同时把serverMessageSender传进去
         List<AbstractCore> allCore = EnhancedServiceLoader.loadAll(AbstractCore.class,
                 new Class[] {ServerMessageSender.class}, new Object[] {messageSender});
         if (CollectionUtils.isNotEmpty(allCore)) {
@@ -68,7 +72,8 @@ public class DefaultCore implements Core {
     }
 
     /**
-     * get core
+     * get core 根据分支模式 返回相应的core
+     * 比如传入at, 返回 ATCore
      *
      * @param branchType the branchType
      * @return the core
@@ -82,7 +87,7 @@ public class DefaultCore implements Core {
     }
 
     /**
-     * only for mock
+     * only for mock 测试用
      *
      * @param branchType the branchType
      * @param core the core
@@ -91,9 +96,21 @@ public class DefaultCore implements Core {
         coreMap.put(branchType, core);
     }
 
+    /**
+     * 进行注册分支
+     * @param branchType the branch type
+     * @param resourceId the resource id
+     * @param clientId   the client id
+     * @param xid        the xid
+     * @param applicationData the context
+     * @param lockKeys   the lock keys
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public Long branchRegister(BranchType branchType, String resourceId, String clientId, String xid,
                                String applicationData, String lockKeys) throws TransactionException {
+        // TODO: 拿到相应的Core 去 注册分支
         return getCore(branchType).branchRegister(branchType, resourceId, clientId, xid,
                 applicationData, lockKeys);
     }
@@ -120,16 +137,26 @@ public class DefaultCore implements Core {
         return getCore(branchSession.getBranchType()).branchRollback(globalSession, branchSession);
     }
 
+    /**
+     * TODO: 开启全局事务
+     * @param applicationId           ID of the application who begins this transaction.
+     * @param transactionServiceGroup ID of the transaction service group.
+     * @param name                    Give a name to the global transaction.
+     * @param timeout                 Timeout of the global transaction.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public String begin(String applicationId, String transactionServiceGroup, String name, int timeout)
             throws TransactionException {
-        GlobalSession session = GlobalSession.createGlobalSession(applicationId, transactionServiceGroup, name,
-                timeout);
+        // TODO: 搞一个GlobalSession
+        GlobalSession session = GlobalSession.createGlobalSession(applicationId, transactionServiceGroup, name, timeout);
         session.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
 
         session.begin();
 
         // transaction start event
+        // TODO: 发布事务开启事件
         eventBus.post(new GlobalTransactionEvent(session.getTransactionId(), GlobalTransactionEvent.ROLE_TC,
                 session.getTransactionName(), session.getBeginTime(), null, session.getStatus()));
 

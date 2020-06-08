@@ -98,6 +98,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             return;
         }
         assertXIDNull();
+        // TODO: 开启事务时，如果存在xid，这里可以看出是直接抛异常的
         if (RootContext.getXID() != null) {
             throw new IllegalStateException();
         }

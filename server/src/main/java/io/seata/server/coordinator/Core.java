@@ -21,13 +21,14 @@ import io.seata.server.session.GlobalSession;
 
 /**
  * The interface Core.
- *
+ * 核心实现接口，基本上 囊括了 所有要处理的事件
  * @author sharajava
  */
 public interface Core extends TransactionCoordinatorInbound, TransactionCoordinatorOutbound {
 
     /**
      * Do global commit.
+     * 全局事务提交
      *
      * @param globalSession the global session
      * @param retrying      the retrying
@@ -38,6 +39,7 @@ public interface Core extends TransactionCoordinatorInbound, TransactionCoordina
 
     /**
      * Do global rollback.
+     * 全局事务回滚
      *
      * @param globalSession the global session
      * @param retrying      the retrying
@@ -48,7 +50,7 @@ public interface Core extends TransactionCoordinatorInbound, TransactionCoordina
 
     /**
      * Do global report.
-     *
+     * 全局事务上报
      * @param globalSession the global session
      * @param xid           Transaction id.
      * @param param         the global status

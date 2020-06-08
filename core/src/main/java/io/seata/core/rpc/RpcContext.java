@@ -62,6 +62,7 @@ public class RpcContext {
 
     /**
      * dbkeyRm
+     * TODO: 第一个key : resourceId, 第二个key: port, 然后rpcContext
      */
     private ConcurrentMap<String, ConcurrentMap<Integer, RpcContext>> clientRMHolderMap;
 
@@ -138,9 +139,9 @@ public class RpcContext {
      */
     public void holdInResourceManagerChannels(String resourceId, Integer clientPort) {
         if (null == this.clientRMHolderMap) {
-            this.clientRMHolderMap = new ConcurrentHashMap<String, ConcurrentMap<Integer, RpcContext>>();
+            this.clientRMHolderMap = new ConcurrentHashMap<>();
         }
-        clientRMHolderMap.putIfAbsent(resourceId, new ConcurrentHashMap<Integer, RpcContext>());
+        clientRMHolderMap.putIfAbsent(resourceId, new ConcurrentHashMap<>());
         ConcurrentMap<Integer, RpcContext> portMap = clientRMHolderMap.get(resourceId);
         portMap.put(clientPort, this);
     }

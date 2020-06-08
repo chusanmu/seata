@@ -21,7 +21,7 @@ import io.seata.common.util.CollectionUtils;
 
 /**
  * The type Abstract load balance.
- *
+ * TODO: 负载均衡器的抽象实现，如果集合为空，直接返回一个空，如果只有一个，则拿第一个，否则让子类去实现挑选策略
  * @author slievrly
  */
 public abstract class AbstractLoadBalance implements LoadBalance {

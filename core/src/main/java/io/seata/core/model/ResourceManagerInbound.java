@@ -28,6 +28,7 @@ public interface ResourceManagerInbound {
 
     /**
      * Commit a branch transaction.
+     * TODO: 提交一个分支事务
      *
      * @param branchType      the branch type
      * @param xid             Transaction id.
@@ -42,6 +43,7 @@ public interface ResourceManagerInbound {
 
     /**
      * Rollback a branch transaction.
+     * TODO: 回滚一个分支事务
      *
      * @param branchType      the branch type
      * @param xid             Transaction id.

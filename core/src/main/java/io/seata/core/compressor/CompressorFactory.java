@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * the type compressor factory
+ * 压缩工厂
  * @author jsbxyyx
  */
 public class CompressorFactory {
@@ -33,6 +34,7 @@ public class CompressorFactory {
     protected static final Map<CompressorType, Compressor> COMPRESSOR_MAP = new ConcurrentHashMap<CompressorType, Compressor>();
 
     static {
+        // TODO: 默认存了一个 不压缩的
         COMPRESSOR_MAP.put(CompressorType.NONE, new NoneCompressor());
     }
 
@@ -43,10 +45,13 @@ public class CompressorFactory {
      * @return the compressor
      */
     public static Compressor getCompressor(byte code) {
+        // TODO: 根据code拿到一个压缩器
         CompressorType type = CompressorType.getByCode(code);
+        // TODO: 如果本地缓存有，直接返回
         if (COMPRESSOR_MAP.get(type) != null) {
             return COMPRESSOR_MAP.get(type);
         }
+        // TODO: 否则去全局加载去，然后加到本类缓存中，之后返回
         Compressor impl = EnhancedServiceLoader.load(Compressor.class, type.name());
         COMPRESSOR_MAP.putIfAbsent(type, impl);
         return impl;

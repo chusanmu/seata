@@ -93,6 +93,7 @@ public class DefaultResourceManager implements ResourceManager {
     public Long branchRegister(BranchType branchType, String resourceId,
                                String clientId, String xid, String applicationData, String lockKeys)
         throws TransactionException {
+        // TODO: 根据分支类型 获得一个resourceManager，然后进行注册分支
         return getResourceManager(branchType).branchRegister(branchType, resourceId, clientId, xid, applicationData,
             lockKeys);
     }

@@ -19,12 +19,20 @@ import java.io.Serializable;
 
 /**
  * The type Heartbeat message.
+ * TODO: 心跳 message
  *
  * @author slievrly
  */
 public class HeartbeatMessage implements MessageTypeAware, Serializable {
     private static final long serialVersionUID = -985316399527884899L;
+    /**
+     * 默认为ping
+     */
     private boolean ping = true;
+
+
+    /* ---------------- 定义ping pong类型 -------------- */
+
     /**
      * The constant PING.
      */
@@ -40,6 +48,7 @@ public class HeartbeatMessage implements MessageTypeAware, Serializable {
 
     @Override
     public short getTypeCode() {
+        // TODO: 返回一个心跳消息类型
         return MessageType.TYPE_HEARTBEAT_MSG;
     }
 

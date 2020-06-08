@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The type Branch session.
+ * 分支session
  *
  * @author sharajava
  */
@@ -46,28 +47,51 @@ public class BranchSession implements Lockable, Comparable<BranchSession>, Sessi
     private static ThreadLocal<ByteBuffer> byteBufferThreadLocal = ThreadLocal.withInitial(() -> ByteBuffer.allocate(
         MAX_BRANCH_SESSION_SIZE));
 
+    /**
+     * XID
+     */
     private String xid;
 
+    /**
+     * 事务ID
+     */
     private long transactionId;
 
+    /**
+     * 分支ID
+     */
     private long branchId;
 
+    /**
+     * 资源组Id
+     */
     private String resourceGroupId;
 
+    /**
+     * 资源Id
+     */
     private String resourceId;
 
+    /**
+     * 上锁的key
+     */
     private String lockKey;
 
+    /**
+     * 分支类型
+     */
     private BranchType branchType;
 
+    /**
+     * 分支状态，rm会进行上报状态的
+     */
     private BranchStatus status = BranchStatus.Unknown;
 
     private String clientId;
 
     private String applicationData;
 
-    private ConcurrentMap<FileLocker.BucketLockMap, Set<String>> lockHolder
-        = new ConcurrentHashMap<>();
+    private ConcurrentMap<FileLocker.BucketLockMap, Set<String>> lockHolder = new ConcurrentHashMap<>();
 
     /**
      * Gets application data.
