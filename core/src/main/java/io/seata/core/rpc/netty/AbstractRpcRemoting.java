@@ -152,6 +152,7 @@ public abstract class AbstractRpcRemoting implements Disposable {
                 for (Map.Entry<Integer, MessageFuture> entry : futures.entrySet()) {
                     // TODO: 如果超时了，直接进行一个移除
                     if (entry.getValue().isTimeout()) {
+                        // TODO: 直接移除相应的key
                         futures.remove(entry.getKey());
                         entry.getValue().setResultMessage(null);
                         if (LOGGER.isDebugEnabled()) {
