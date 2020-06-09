@@ -280,6 +280,7 @@ public abstract class AbstractRpcRemoting implements Disposable {
                 }
                 // 如果未发送，则唤醒等待线程进行发送
                 if (!isSending) {
+                    // TODO: 加锁
                     synchronized (mergeLock) {
                         mergeLock.notifyAll();
                     }
