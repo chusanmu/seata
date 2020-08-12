@@ -32,7 +32,7 @@ import io.seata.core.logger.StackTraceLogger;
 import io.seata.core.model.BranchStatus;
 import io.seata.core.model.BranchType;
 import io.seata.core.model.GlobalStatus;
-import io.seata.core.rpc.ServerMessageSender;
+import io.seata.core.rpc.RemotingServer;
 import io.seata.server.event.EventBusManager;
 import io.seata.server.session.BranchSession;
 import io.seata.server.session.GlobalSession;
@@ -50,20 +50,16 @@ public class DefaultCore implements Core {
 
     private EventBus eventBus = EventBusManager.get();
 
-    /**
-     * TODO: 缓存目前seata支持的几种模式
-     */
     private static Map<BranchType, AbstractCore> coreMap = new ConcurrentHashMap<>();
 
     /**
      * get the Default core.
      *
-     * @param messageSender the message sender
+     * @param remotingServer the remoting server
      */
-    public DefaultCore(ServerMessageSender messageSender) {
-        // TODO: 把继承了 AbstractCore的实现，全loader进来，同时把serverMessageSender传进去
+    public DefaultCore(RemotingServer remotingServer) {
         List<AbstractCore> allCore = EnhancedServiceLoader.loadAll(AbstractCore.class,
-                new Class[] {ServerMessageSender.class}, new Object[] {messageSender});
+            new Class[]{RemotingServer.class}, new Object[]{remotingServer});
         if (CollectionUtils.isNotEmpty(allCore)) {
             for (AbstractCore core : allCore) {
                 coreMap.put(core.getHandleBranchType(), core);
@@ -72,8 +68,7 @@ public class DefaultCore implements Core {
     }
 
     /**
-     * get core 根据分支模式 返回相应的core
-     * 比如传入at, 返回 ATCore
+     * get core
      *
      * @param branchType the branchType
      * @return the core
@@ -87,32 +82,20 @@ public class DefaultCore implements Core {
     }
 
     /**
-     * only for mock 测试用
+     * only for mock
      *
      * @param branchType the branchType
-     * @param core the core
+     * @param core       the core
      */
     public void mockCore(BranchType branchType, AbstractCore core) {
         coreMap.put(branchType, core);
     }
 
-    /**
-     * 进行注册分支
-     * @param branchType the branch type
-     * @param resourceId the resource id
-     * @param clientId   the client id
-     * @param xid        the xid
-     * @param applicationData the context
-     * @param lockKeys   the lock keys
-     * @return
-     * @throws TransactionException
-     */
     @Override
     public Long branchRegister(BranchType branchType, String resourceId, String clientId, String xid,
                                String applicationData, String lockKeys) throws TransactionException {
-        // TODO: 拿到相应的Core 去 注册分支
         return getCore(branchType).branchRegister(branchType, resourceId, clientId, xid,
-                applicationData, lockKeys);
+            applicationData, lockKeys);
     }
 
     @Override
@@ -123,7 +106,7 @@ public class DefaultCore implements Core {
 
     @Override
     public boolean lockQuery(BranchType branchType, String resourceId, String xid, String lockKeys)
-            throws TransactionException {
+        throws TransactionException {
         return getCore(branchType).lockQuery(branchType, resourceId, xid, lockKeys);
     }
 
@@ -137,28 +120,18 @@ public class DefaultCore implements Core {
         return getCore(branchSession.getBranchType()).branchRollback(globalSession, branchSession);
     }
 
-    /**
-     * TODO: 开启全局事务
-     * @param applicationId           ID of the application who begins this transaction.
-     * @param transactionServiceGroup ID of the transaction service group.
-     * @param name                    Give a name to the global transaction.
-     * @param timeout                 Timeout of the global transaction.
-     * @return
-     * @throws TransactionException
-     */
     @Override
     public String begin(String applicationId, String transactionServiceGroup, String name, int timeout)
-            throws TransactionException {
-        // TODO: 搞一个GlobalSession
-        GlobalSession session = GlobalSession.createGlobalSession(applicationId, transactionServiceGroup, name, timeout);
+        throws TransactionException {
+        GlobalSession session = GlobalSession.createGlobalSession(applicationId, transactionServiceGroup, name,
+            timeout);
         session.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
 
         session.begin();
 
         // transaction start event
-        // TODO: 发布事务开启事件
         eventBus.post(new GlobalTransactionEvent(session.getTransactionId(), GlobalTransactionEvent.ROLE_TC,
-                session.getTransactionName(), session.getBeginTime(), null, session.getStatus()));
+            session.getTransactionName(), session.getBeginTime(), null, session.getStatus()));
 
         return session.getXid();
     }
@@ -173,25 +146,26 @@ public class DefaultCore implements Core {
         // just lock changeStatus
 
         boolean shouldCommit = SessionHolder.lockAndExecute(globalSession, () -> {
-            // the lock should release after branch commit
             // Highlight: Firstly, close the session, then no more branch can be registered.
             globalSession.closeAndClean();
             if (globalSession.getStatus() == GlobalStatus.Begin) {
-                globalSession.changeStatus(GlobalStatus.Committing);
-                return true;
+                if (globalSession.canBeCommittedAsync()) {
+                    globalSession.asyncCommit();
+                    return false;
+                } else {
+                    globalSession.changeStatus(GlobalStatus.Committing);
+                    return true;
+                }
             }
             return false;
         });
-        if (!shouldCommit) {
-            return globalSession.getStatus();
-        }
-        if (globalSession.canBeCommittedAsync()) {
-            globalSession.asyncCommit();
-            return GlobalStatus.Committed;
-        } else {
+
+        if (shouldCommit) {
             doGlobalCommit(globalSession, false);
+            return globalSession.getStatus();
+        } else {
+            return globalSession.getStatus() == GlobalStatus.AsyncCommitting ? GlobalStatus.Committed : globalSession.getStatus();
         }
-        return globalSession.getStatus();
     }
 
     @Override
@@ -199,7 +173,7 @@ public class DefaultCore implements Core {
         boolean success = true;
         // start committing event
         eventBus.post(new GlobalTransactionEvent(globalSession.getTransactionId(), GlobalTransactionEvent.ROLE_TC,
-                globalSession.getTransactionName(), globalSession.getBeginTime(), null, globalSession.getStatus()));
+            globalSession.getTransactionName(), globalSession.getBeginTime(), null, globalSession.getStatus()));
 
         if (globalSession.isSaga()) {
             success = getCore(BranchType.SAGA).doGlobalCommit(globalSession, retrying);
@@ -261,8 +235,8 @@ public class DefaultCore implements Core {
 
             // committed event
             eventBus.post(new GlobalTransactionEvent(globalSession.getTransactionId(), GlobalTransactionEvent.ROLE_TC,
-                    globalSession.getTransactionName(), globalSession.getBeginTime(), System.currentTimeMillis(),
-                    globalSession.getStatus()));
+                globalSession.getTransactionName(), globalSession.getBeginTime(), System.currentTimeMillis(),
+                globalSession.getStatus()));
 
             LOGGER.info("Committing global transaction is successfully done, xid = {}.", globalSession.getXid());
         }
@@ -298,7 +272,7 @@ public class DefaultCore implements Core {
         boolean success = true;
         // start rollback event
         eventBus.post(new GlobalTransactionEvent(globalSession.getTransactionId(), GlobalTransactionEvent.ROLE_TC,
-                globalSession.getTransactionName(), globalSession.getBeginTime(), null, globalSession.getStatus()));
+            globalSession.getTransactionName(), globalSession.getBeginTime(), null, globalSession.getStatus()));
 
         if (globalSession.isSaga()) {
             success = getCore(BranchType.SAGA).doGlobalRollback(globalSession, retrying);
@@ -314,7 +288,7 @@ public class DefaultCore implements Core {
                     switch (branchStatus) {
                         case PhaseTwo_Rollbacked:
                             globalSession.removeBranch(branchSession);
-                            LOGGER.info("Rollback branch transaction  successfully, xid = {} branchId = {}", globalSession.getXid(), branchSession.getBranchId());
+                            LOGGER.info("Rollback branch transaction successfully, xid = {} branchId = {}", globalSession.getXid(), branchSession.getBranchId());
                             continue;
                         case PhaseTwo_RollbackFailed_Unretryable:
                             SessionHelper.endRollbackFailed(globalSession);
@@ -355,8 +329,8 @@ public class DefaultCore implements Core {
 
             // rollbacked event
             eventBus.post(new GlobalTransactionEvent(globalSession.getTransactionId(), GlobalTransactionEvent.ROLE_TC,
-                    globalSession.getTransactionName(), globalSession.getBeginTime(), System.currentTimeMillis(),
-                    globalSession.getStatus()));
+                globalSession.getTransactionName(), globalSession.getBeginTime(), System.currentTimeMillis(),
+                globalSession.getStatus()));
 
             LOGGER.info("Rollback global transaction successfully, xid = {}.", globalSession.getXid());
         }
@@ -366,7 +340,7 @@ public class DefaultCore implements Core {
     @Override
     public GlobalStatus getStatus(String xid) throws TransactionException {
         GlobalSession globalSession = SessionHolder.findGlobalSession(xid, false);
-        if (null == globalSession) {
+        if (globalSession == null) {
             return GlobalStatus.Finished;
         } else {
             return globalSession.getStatus();

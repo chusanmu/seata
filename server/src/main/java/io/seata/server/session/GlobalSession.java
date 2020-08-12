@@ -54,9 +54,6 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
     private static ThreadLocal<ByteBuffer> byteBufferThreadLocal = ThreadLocal.withInitial(() -> ByteBuffer.allocate(
         MAX_GLOBAL_SESSION_SIZE));
 
-    /**
-     * xid
-     */
     private String xid;
 
     private long transactionId;
@@ -456,7 +453,8 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
      */
     public static GlobalSession createGlobalSession(String applicationId, String txServiceGroup, String txName,
                                                     int timeout) {
-        return new GlobalSession(applicationId, txServiceGroup, txName, timeout);
+        GlobalSession session = new GlobalSession(applicationId, txServiceGroup, txName, timeout);
+        return session;
     }
 
     /**
@@ -468,15 +466,9 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         this.active = active;
     }
 
-    /**
-     * TODO: 这个方法很有意思
-     * @return
-     */
     @Override
     public byte[] encode() {
-        // TODO: 进行编码 globalSession信息
 
-        // TODO: 当前应用ID
         byte[] byApplicationIdBytes = applicationId != null ? applicationId.getBytes() : null;
 
         byte[] byServiceGroupBytes = transactionServiceGroup != null ? transactionServiceGroup.getBytes() : null;
@@ -487,64 +479,32 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
 
         byte[] applicationDataBytes = applicationData != null ? applicationData.getBytes() : null;
 
-        /**
-         * 计算应当需要的size
-         */
         int size = calGlobalSessionSize(byApplicationIdBytes, byServiceGroupBytes, byTxNameBytes, xidBytes,
             applicationDataBytes);
 
-        // TODO: 如果大于全局session的最大size则抛出异常
         if (size > MAX_GLOBAL_SESSION_SIZE) {
-            // TODO: 这地方异常信息，有个错误
             throw new RuntimeException("global session size exceeded, size : " + size + " maxBranchSessionSize : " +
                 MAX_GLOBAL_SESSION_SIZE);
         }
-        // TODO: 获得一段内存，size为最大的全局session的size
         ByteBuffer byteBuffer = byteBufferThreadLocal.get();
-        //recycle 先clear下
+        //recycle
         byteBuffer.clear();
 
-
-        /**
-         * 填充内存
-         *  final int size = 8 // transactionId
-         *             + 4 // timeout
-         *             + 2 // byApplicationIdBytes.length
-         *             + 2 // byServiceGroupBytes.length
-         *             + 2 // byTxNameBytes.length
-         *             + 4 // xidBytes.length
-         *             + 4 // applicationDataBytes.length
-         *             + 8 // beginTime
-         *             + 1 // statusCode
-         *             + (byApplicationIdBytes == null ? 0 : byApplicationIdBytes.length)
-         *             + (byServiceGroupBytes == null ? 0 : byServiceGroupBytes.length)
-         *             + (byTxNameBytes == null ? 0 : byTxNameBytes.length)
-         *             + (xidBytes == null ? 0 : xidBytes.length)
-         *             + (applicationDataBytes == null ? 0 : applicationDataBytes.length);
-         */
-        /* ---------------- 接下来开始填充byteBuffer -------------- */
-        // TODO: 首先填充transactionId 事务ID
         byteBuffer.putLong(transactionId);
-        // TODO: 放置timeout 超时时间
         byteBuffer.putInt(timeout);
-        // TODO: 如果byApplicationIdBytes 不为空
-        if (null != byApplicationIdBytes) {
-            // TODO: 先放 byApplicationIdBytes的size
+        if (byApplicationIdBytes != null) {
             byteBuffer.putShort((short)byApplicationIdBytes.length);
-            // TODO: 然后把实际的数据放进去
             byteBuffer.put(byApplicationIdBytes);
         } else {
-            // TODO: 否则直接在size位置 放个0就好了，表示没有 ApplicationId
             byteBuffer.putShort((short)0);
         }
-        // TODO: 下面逻辑都是一样的
-        if (null != byServiceGroupBytes) {
+        if (byServiceGroupBytes != null) {
             byteBuffer.putShort((short)byServiceGroupBytes.length);
             byteBuffer.put(byServiceGroupBytes);
         } else {
             byteBuffer.putShort((short)0);
         }
-        if (null != byTxNameBytes) {
+        if (byTxNameBytes != null) {
             byteBuffer.putShort((short)byTxNameBytes.length);
             byteBuffer.put(byTxNameBytes);
         } else {
@@ -562,27 +522,15 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         } else {
             byteBuffer.putInt(0);
         }
-        // TODO: 放置beginTime
+
         byteBuffer.putLong(beginTime);
-        // TODO: 放状态
         byteBuffer.put((byte)status.getCode());
-        // TODO: 这一步不能忘 flip()一下
         byteBuffer.flip();
         byte[] result = new byte[byteBuffer.limit()];
-        // TODO: 将byteBuffer中的值 放到 result中，然后返回
         byteBuffer.get(result);
         return result;
     }
 
-    /**
-     * TODO: 这地方处理很精细了
-     * @param byApplicationIdBytes
-     * @param byServiceGroupBytes
-     * @param byTxNameBytes
-     * @param xidBytes
-     * @param applicationDataBytes
-     * @return
-     */
     private int calGlobalSessionSize(byte[] byApplicationIdBytes, byte[] byServiceGroupBytes, byte[] byTxNameBytes,
                                      byte[] xidBytes, byte[] applicationDataBytes) {
         final int size = 8 // transactionId
@@ -602,21 +550,12 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         return size;
     }
 
-    /**
-     * 解码操作， 和编码操作是相反的
-     * @param a
-     */
     @Override
     public void decode(byte[] a) {
-        // TODO: 包成ByteBuffer
         ByteBuffer byteBuffer = ByteBuffer.wrap(a);
-        // TODO: 拿到transactionId
         this.transactionId = byteBuffer.getLong();
-        // TODO: 直接获取超时时间
         this.timeout = byteBuffer.getInt();
-        // TODO: 依次和编码操作相反，先拿长度，长度大于0，才表示有值嘛，然后get指定长度的值，用string包一下，成为字符串
         short applicationIdLen = byteBuffer.getShort();
-        /* ---------------- 依次取出来，很有意思 -------------- */
         if (applicationIdLen > 0) {
             byte[] byApplicationId = new byte[applicationIdLen];
             byteBuffer.get(byApplicationId);
@@ -660,10 +599,6 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         return branchSessions.size() > 0;
     }
 
-    /**
-     * TODO: 其实内部用的ReentrantLock, 利用了锁超时，2秒 加不上锁，直接抛异常
-     * @throws TransactionException
-     */
     public void lock() throws TransactionException {
         globalSessionLock.lock();
     }
@@ -672,19 +607,10 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         globalSessionLock.unlock();
     }
 
-    /**
-     * TODO: 全局事务锁
-     */
     private static class GlobalSessionLock {
 
-        /**
-         * 内部持有了一份 ReentrantLock(); 委托给了ReentrantLock()
-         */
         private Lock globalSessionLock = new ReentrantLock();
 
-        /**
-         * 默认 2 秒 超时锁，2秒锁失败，则抛出异常
-         */
         private static final int GLOBAL_SESSION_LOCK_TIME_OUT_MILLS = 2 * 1000;
 
         public void lock() throws TransactionException {
@@ -710,10 +636,6 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         void run() throws TransactionException;
     }
 
-    /**
-     * 定义了一个 接口，用于执行加锁中间的模板代码
-     * @param <V>
-     */
     @FunctionalInterface
     public interface LockCallable<V> {
 

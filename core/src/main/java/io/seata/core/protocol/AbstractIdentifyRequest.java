@@ -27,7 +27,7 @@ public abstract class AbstractIdentifyRequest extends AbstractMessage {
      * The Version.
      * TODO: 当前版本号
      */
-    protected String version = Version.CURRENT;
+    protected String version = Version.getCurrent();
 
     /**
      * The Application id.

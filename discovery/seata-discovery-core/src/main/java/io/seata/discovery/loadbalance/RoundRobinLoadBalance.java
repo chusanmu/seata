@@ -26,13 +26,13 @@ import io.seata.common.loader.LoadLevel;
  *
  * @author slievrly
  */
-@LoadLevel(name = "RoundRobinLoadBalance", order = 1)
+@LoadLevel(name = "RoundRobinLoadBalance")
 public class RoundRobinLoadBalance extends AbstractLoadBalance {
 
     private final AtomicInteger sequence = new AtomicInteger();
 
     @Override
-    protected <T> T doSelect(List<T> invokers) {
+    protected <T> T doSelect(List<T> invokers, String xid) {
         int length = invokers.size();
         // TODO: seata优化点，这地方可以进行一个优化，如果 getPositiveSequence() 是2的幂，可以直接进行位运算
         int positiveSequence = getPositiveSequence();
