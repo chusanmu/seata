@@ -23,14 +23,19 @@ import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.eventbus.Subscribe;
 import io.seata.common.exception.ShouldNeverHappenException;
 import io.seata.common.thread.NamedThreadFactory;
 import io.seata.common.util.StringUtils;
+import io.seata.config.ConfigurationCache;
 import io.seata.config.ConfigurationChangeEvent;
 import io.seata.config.ConfigurationChangeListener;
 import io.seata.config.ConfigurationFactory;
 import io.seata.core.constants.ConfigurationKeys;
+import io.seata.core.event.EventBus;
+import io.seata.core.event.GuavaEventBus;
 import io.seata.rm.GlobalLockTemplate;
+import io.seata.spring.event.DegradeCheckEvent;
 import io.seata.tm.TransactionManagerHolder;
 import io.seata.tm.api.DefaultFailureHandlerImpl;
 import io.seata.tm.api.FailureHandler;
@@ -43,16 +48,15 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.aop.framework.AopProxyUtils;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.core.BridgeMethodResolver;
 import org.springframework.util.ClassUtils;
 
-
-import static io.seata.core.constants.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANSACTION;
-import static io.seata.core.constants.DefaultValues.DEFAULT_TM_DEGRADE_CHECK;
-import static io.seata.core.constants.DefaultValues.DEFAULT_TM_DEGRADE_CHECK_ALLOW_TIMES;
-import static io.seata.core.constants.DefaultValues.DEFAULT_TM_DEGRADE_CHECK_PERIOD;
+import static io.seata.common.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANSACTION;
+import static io.seata.common.DefaultValues.DEFAULT_GLOBAL_TRANSACTION_TIMEOUT;
+import static io.seata.common.DefaultValues.DEFAULT_TM_DEGRADE_CHECK;
+import static io.seata.common.DefaultValues.DEFAULT_TM_DEGRADE_CHECK_ALLOW_TIMES;
+import static io.seata.common.DefaultValues.DEFAULT_TM_DEGRADE_CHECK_PERIOD;
 
 /**
  * The type Global transactional interceptor.
@@ -66,7 +70,6 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
 
     private final TransactionalTemplate transactionalTemplate = new TransactionalTemplate();
     private final GlobalLockTemplate<Object> globalLockTemplate = new GlobalLockTemplate<>();
-    private final GlobalTransactionalSource globalTransactionalSource;
     private final FailureHandler failureHandler;
     private volatile boolean disable;
     private static int degradeCheckPeriod;
@@ -74,45 +77,80 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
     private static int degradeCheckAllowTimes;
     private static volatile Integer degradeNum = 0;
     private static volatile Integer reachNum = 0;
+    private static final EventBus EVENT_BUS = new GuavaEventBus("degradeCheckEventBus", true);
     private static ScheduledThreadPoolExecutor executor =
-            new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("degradeCheckWorker", 1, true));
+        new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("degradeCheckWorker", 1, true));
+
+    //region DEFAULT_GLOBAL_TRANSACTION_TIMEOUT
+
+    private static int defaultGlobalTransactionTimeout = 0;
+
+    private void initDefaultGlobalTransactionTimeout() {
+        if (GlobalTransactionalInterceptor.defaultGlobalTransactionTimeout <= 0) {
+            int defaultGlobalTransactionTimeout;
+            try {
+                defaultGlobalTransactionTimeout = ConfigurationFactory.getInstance().getInt(
+                        ConfigurationKeys.DEFAULT_GLOBAL_TRANSACTION_TIMEOUT, DEFAULT_GLOBAL_TRANSACTION_TIMEOUT);
+            } catch (Exception e) {
+                LOGGER.error("Illegal global transaction timeout value: " + e.getMessage());
+                defaultGlobalTransactionTimeout = DEFAULT_GLOBAL_TRANSACTION_TIMEOUT;
+            }
+            if (defaultGlobalTransactionTimeout <= 0) {
+                LOGGER.warn("Global transaction timeout value '{}' is illegal, and has been reset to the default value '{}'",
+                        defaultGlobalTransactionTimeout, DEFAULT_GLOBAL_TRANSACTION_TIMEOUT);
+                defaultGlobalTransactionTimeout = DEFAULT_GLOBAL_TRANSACTION_TIMEOUT;
+            }
+            GlobalTransactionalInterceptor.defaultGlobalTransactionTimeout = defaultGlobalTransactionTimeout;
+        }
+    }
+
+    //endregion
 
     /**
      * Instantiates a new Global transactional interceptor.
      *
-     * @param failureHandler the failure handler
+     * @param failureHandler
+     *            the failure handler
      */
-    public GlobalTransactionalInterceptor(FailureHandler failureHandler, GlobalTransactionalSource globalTransactionalSource) {
+    public GlobalTransactionalInterceptor(FailureHandler failureHandler) {
         this.failureHandler = failureHandler == null ? DEFAULT_FAIL_HANDLER : failureHandler;
-        this.globalTransactionalSource = globalTransactionalSource;
         this.disable = ConfigurationFactory.getInstance().getBoolean(ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION,
-                DEFAULT_DISABLE_GLOBAL_TRANSACTION);
-        this.degradeCheck = ConfigurationFactory.getInstance().getBoolean(ConfigurationKeys.CLIENT_DEGRADE_CHECK,
-                DEFAULT_TM_DEGRADE_CHECK);
+            DEFAULT_DISABLE_GLOBAL_TRANSACTION);
+        degradeCheck = ConfigurationFactory.getInstance().getBoolean(ConfigurationKeys.CLIENT_DEGRADE_CHECK,
+            DEFAULT_TM_DEGRADE_CHECK);
         if (degradeCheck) {
-            this.degradeCheckPeriod = ConfigurationFactory.getInstance()
-                    .getInt(ConfigurationKeys.CLIENT_DEGRADE_CHECK_PERIOD, DEFAULT_TM_DEGRADE_CHECK_PERIOD);
-            this.degradeCheckAllowTimes = ConfigurationFactory.getInstance()
-                    .getInt(ConfigurationKeys.CLIENT_DEGRADE_CHECK_ALLOW_TIMES, DEFAULT_TM_DEGRADE_CHECK_ALLOW_TIMES);
+            ConfigurationCache.addConfigListener(ConfigurationKeys.CLIENT_DEGRADE_CHECK, this);
+            degradeCheckPeriod = ConfigurationFactory.getInstance().getInt(
+                ConfigurationKeys.CLIENT_DEGRADE_CHECK_PERIOD, DEFAULT_TM_DEGRADE_CHECK_PERIOD);
+            degradeCheckAllowTimes = ConfigurationFactory.getInstance().getInt(
+                ConfigurationKeys.CLIENT_DEGRADE_CHECK_ALLOW_TIMES, DEFAULT_TM_DEGRADE_CHECK_ALLOW_TIMES);
+            EVENT_BUS.register(this);
             if (degradeCheckPeriod > 0 && degradeCheckAllowTimes > 0) {
                 startDegradeCheck();
             }
         }
+        this.initDefaultGlobalTransactionTimeout();
     }
 
     @Override
     public Object invoke(final MethodInvocation methodInvocation) throws Throwable {
-        Class<?> targetClass = AopProxyUtils.ultimateTargetClass(methodInvocation.getThis());
-        Annotation annotation = globalTransactionalSource.getGlobalTransactionalAnnotation(methodInvocation.getMethod(), targetClass);
-        boolean localDisable = disable || (degradeCheck && degradeNum >= degradeCheckAllowTimes);
-        if (!localDisable) {
-            if (annotation instanceof GlobalTransactional) {
-                return handleGlobalTransaction(methodInvocation, ((GlobalTransactional) annotation));
-            } else if (annotation instanceof GlobalLock) {
-                return handleGlobalLock(methodInvocation);
+        Class<?> targetClass =
+            methodInvocation.getThis() != null ? AopUtils.getTargetClass(methodInvocation.getThis()) : null;
+        Method specificMethod = ClassUtils.getMostSpecificMethod(methodInvocation.getMethod(), targetClass);
+        if (specificMethod != null && !specificMethod.getDeclaringClass().equals(Object.class)) {
+            final Method method = BridgeMethodResolver.findBridgedMethod(specificMethod);
+            final GlobalTransactional globalTransactionalAnnotation =
+                getAnnotation(method, targetClass, GlobalTransactional.class);
+            final GlobalLock globalLockAnnotation = getAnnotation(method, targetClass, GlobalLock.class);
+            boolean localDisable = disable || (degradeCheck && degradeNum >= degradeCheckAllowTimes);
+            if (!localDisable) {
+                if (globalTransactionalAnnotation != null) {
+                    return handleGlobalTransaction(methodInvocation, globalTransactionalAnnotation);
+                } else if (globalLockAnnotation != null) {
+                    return handleGlobalLock(methodInvocation);
+                }
             }
         }
-
         return methodInvocation.proceed();
     }
 
@@ -129,7 +167,7 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
     }
 
     private Object handleGlobalTransaction(final MethodInvocation methodInvocation,
-                                           final GlobalTransactional globalTrxAnno) throws Throwable {
+        final GlobalTransactional globalTrxAnno) throws Throwable {
         boolean succeed = true;
         try {
             return transactionalTemplate.execute(new TransactionalExecutor() {
@@ -148,8 +186,14 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
 
                 @Override
                 public TransactionInfo getTransactionInfo() {
+                    // reset the value of timeout
+                    int timeout = globalTrxAnno.timeoutMills();
+                    if (timeout <= 0 || timeout == DEFAULT_GLOBAL_TRANSACTION_TIMEOUT) {
+                        timeout = defaultGlobalTransactionTimeout;
+                    }
+
                     TransactionInfo transactionInfo = new TransactionInfo();
-                    transactionInfo.setTimeOut(globalTrxAnno.timeoutMills());
+                    transactionInfo.setTimeOut(timeout);
                     transactionInfo.setName(name());
                     transactionInfo.setPropagation(globalTrxAnno.propagation());
                     Set<RollbackRule> rollbackRules = new LinkedHashSet<>();
@@ -183,24 +227,24 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
                     failureHandler.onCommitFailure(e.getTransaction(), e.getCause());
                     throw e.getCause();
                 case RollbackFailure:
-                    failureHandler.onRollbackFailure(e.getTransaction(), e.getCause());
-                    throw e.getCause();
+                    failureHandler.onRollbackFailure(e.getTransaction(), e.getOriginalException());
+                    throw e.getOriginalException();
                 case RollbackRetrying:
-                    failureHandler.onRollbackRetrying(e.getTransaction(), e.getCause());
-                    throw e.getCause();
+                    failureHandler.onRollbackRetrying(e.getTransaction(), e.getOriginalException());
+                    throw e.getOriginalException();
                 default:
                     throw new ShouldNeverHappenException(String.format("Unknown TransactionalExecutor.Code: %s", code));
             }
         } finally {
             if (degradeCheck) {
-                onDegradeCheck(succeed);
+                EVENT_BUS.post(new DegradeCheckEvent(succeed));
             }
         }
     }
 
     public <T extends Annotation> T getAnnotation(Method method, Class<?> targetClass, Class<T> annotationClass) {
         return Optional.ofNullable(method).map(m -> m.getAnnotation(annotationClass))
-                .orElse(Optional.ofNullable(targetClass).map(t -> t.getAnnotation(annotationClass)).orElse(null));
+            .orElse(Optional.ofNullable(targetClass).map(t -> t.getAnnotation(annotationClass)).orElse(null));
     }
 
     private String formatMethod(Method method) {
@@ -221,7 +265,7 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
     public void onChangeEvent(ConfigurationChangeEvent event) {
         if (ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION.equals(event.getDataId())) {
             LOGGER.info("{} config changed, old value:{}, new value:{}", ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION,
-                    disable, event.getNewValue());
+                disable, event.getNewValue());
             disable = Boolean.parseBoolean(event.getNewValue().trim());
         } else if (ConfigurationKeys.CLIENT_DEGRADE_CHECK.equals(event.getDataId())) {
             degradeCheck = Boolean.parseBoolean(event.getNewValue());
@@ -240,16 +284,17 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
                 try {
                     String xid = TransactionManagerHolder.get().begin(null, null, "degradeCheck", 60000);
                     TransactionManagerHolder.get().commit(xid);
-                    onDegradeCheck(true);
+                    EVENT_BUS.post(new DegradeCheckEvent(true));
                 } catch (Exception e) {
-                    onDegradeCheck(false);
+                    EVENT_BUS.post(new DegradeCheckEvent(false));
                 }
             }
         }, degradeCheckPeriod, degradeCheckPeriod, TimeUnit.MILLISECONDS);
     }
 
-    private static synchronized void onDegradeCheck(boolean succeed) {
-        if (succeed) {
+    @Subscribe
+    public static void onDegradeCheck(DegradeCheckEvent event) {
+        if (event.isRequestSuccess()) {
             if (degradeNum >= degradeCheckAllowTimes) {
                 reachNum++;
                 if (reachNum >= degradeCheckAllowTimes) {

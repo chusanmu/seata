@@ -15,13 +15,18 @@
  */
 package io.seata.spring.annotation;
 
+import java.lang.reflect.Method;
+import java.util.HashSet;
+import java.util.Set;
+import io.seata.common.util.CollectionUtils;
 import io.seata.common.util.StringUtils;
 import io.seata.config.ConfigurationChangeListener;
 import io.seata.config.ConfigurationFactory;
+import io.seata.config.ConfigurationCache;
 import io.seata.core.constants.ConfigurationKeys;
-import io.seata.core.rpc.netty.RmRpcClient;
-import io.seata.core.rpc.netty.ShutdownHook;
-import io.seata.core.rpc.netty.TmRpcClient;
+import io.seata.core.rpc.netty.RmNettyRemotingClient;
+import io.seata.core.rpc.ShutdownHook;
+import io.seata.core.rpc.netty.TmNettyRemotingClient;
 import io.seata.rm.RMClient;
 import io.seata.spring.tcc.TccActionInterceptor;
 import io.seata.spring.util.SpringProxyUtils;
@@ -43,11 +48,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
 
-import java.lang.reflect.Method;
-import java.util.HashSet;
-import java.util.Set;
 
-import static io.seata.core.constants.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANSACTION;
+import static io.seata.common.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANSACTION;
 
 /**
  * The type Global transaction scanner.
@@ -55,8 +57,8 @@ import static io.seata.core.constants.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANS
  * @author slievrly
  */
 public class GlobalTransactionScanner extends AbstractAutoProxyCreator
-        implements InitializingBean, ApplicationContextAware,
-        DisposableBean {
+    implements InitializingBean, ApplicationContextAware,
+    DisposableBean {
 
     private static final long serialVersionUID = 1L;
 
@@ -77,14 +79,11 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
     private final String txServiceGroup;
     private final int mode;
     private final boolean disableGlobalTransaction = ConfigurationFactory.getInstance().getBoolean(
-            ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION, DEFAULT_DISABLE_GLOBAL_TRANSACTION);
+        ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION, DEFAULT_DISABLE_GLOBAL_TRANSACTION);
 
     private final FailureHandler failureHandlerHook;
 
     private ApplicationContext applicationContext;
-
-    private final GlobalTransactionalSource globalTransactionalSource = new AnnotationGlobalTransactionSource();
-
 
     /**
      * Instantiates a new Global transaction scanner.
@@ -93,15 +92,6 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
      */
     public GlobalTransactionScanner(String txServiceGroup) {
         this(txServiceGroup, txServiceGroup, DEFAULT_MODE);
-    }
-
-    /**
-     * get the globalTransaction source
-     *
-     * @return
-     */
-    public GlobalTransactionalSource getGlobalTransactionalSource() {
-        return globalTransactionalSource;
     }
 
     /**
@@ -199,8 +189,8 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
             ((ConfigurableApplicationContext) applicationContext).registerShutdownHook();
             ShutdownHook.removeRuntimeShutdownHook();
         }
-        ShutdownHook.getInstance().addDisposable(TmRpcClient.getInstance(applicationId, txServiceGroup));
-        ShutdownHook.getInstance().addDisposable(RmRpcClient.getInstance(applicationId, txServiceGroup));
+        ShutdownHook.getInstance().addDisposable(TmNettyRemotingClient.getInstance(applicationId, txServiceGroup));
+        ShutdownHook.getInstance().addDisposable(RmNettyRemotingClient.getInstance(applicationId, txServiceGroup));
     }
 
     @Override
@@ -219,15 +209,20 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
                     //TCC interceptor, proxy bean of sofa:reference/dubbo:reference, and LocalTCC
                     interceptor = new TccActionInterceptor(TCCBeanParserUtils.getRemotingDesc(beanName));
                 } else {
+                    Class<?> serviceInterface = SpringProxyUtils.findTargetClass(bean);
+                    Class<?>[] interfacesIfJdk = SpringProxyUtils.findInterfaces(bean);
 
-                    if (!globalTransactionalSource.existGlobalTransactionalAnnotation(bean)) {
+                    if (!existsAnnotation(new Class[]{serviceInterface})
+                        && !existsAnnotation(interfacesIfJdk)) {
                         return bean;
                     }
 
                     if (interceptor == null) {
                         if (globalTransactionalInterceptor == null) {
-                            globalTransactionalInterceptor = new GlobalTransactionalInterceptor(failureHandlerHook, globalTransactionalSource);
-                            ConfigurationFactory.getInstance().addConfigListener(ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION, (ConfigurationChangeListener) globalTransactionalInterceptor);
+                            globalTransactionalInterceptor = new GlobalTransactionalInterceptor(failureHandlerHook);
+                            ConfigurationCache.addConfigListener(
+                                ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION,
+                                (ConfigurationChangeListener)globalTransactionalInterceptor);
                         }
                         interceptor = globalTransactionalInterceptor;
                     }
@@ -251,13 +246,40 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         }
     }
 
+    private boolean existsAnnotation(Class<?>[] classes) {
+        if (CollectionUtils.isNotEmpty(classes)) {
+            for (Class<?> clazz : classes) {
+                if (clazz == null) {
+                    continue;
+                }
+                GlobalTransactional trxAnno = clazz.getAnnotation(GlobalTransactional.class);
+                if (trxAnno != null) {
+                    return true;
+                }
+                Method[] methods = clazz.getMethods();
+                for (Method method : methods) {
+                    trxAnno = method.getAnnotation(GlobalTransactional.class);
+                    if (trxAnno != null) {
+                        return true;
+                    }
+
+                    GlobalLock lockAnno = method.getAnnotation(GlobalLock.class);
+                    if (lockAnno != null) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private MethodDesc makeMethodDesc(GlobalTransactional anno, Method method) {
         return new MethodDesc(anno, method);
     }
 
     @Override
     protected Object[] getAdvicesAndAdvisorsForBean(Class beanClass, String beanName, TargetSource customTargetSource)
-            throws BeansException {
+        throws BeansException {
         return new Object[]{interceptor};
     }
 
