@@ -16,6 +16,8 @@
 package io.seata.core.compressor;
 
 /**
+ *
+ * 编码压缩的顶级接口
  * @author jsbxyyx
  */
 public interface Compressor {
@@ -24,6 +26,7 @@ public interface Compressor {
      * compress byte[] to byte[].
      * @param bytes the bytes
      * @return the byte[]
+     * 压缩，压缩肯定是进去是字节，出来也是字节
      */
     byte[] compress(byte[] bytes);
 
@@ -31,6 +34,7 @@ public interface Compressor {
      * decompress byte[] to byte[].
      * @param bytes the bytes
      * @return the byte[]
+     * 解压，出来字节，进去的字节长度 肯定是小于 出来的字节长度的
      */
     byte[] decompress(byte[] bytes);
 

@@ -21,6 +21,7 @@ import io.seata.core.model.GlobalStatus;
 
 /**
  * The interface Session lifecycle listener.
+ * session的生命周期监听器
  *
  * @author sharajava
  */
@@ -28,6 +29,7 @@ public interface SessionLifecycleListener {
 
     /**
      * On begin.
+     * 开启全局事务，触发事件
      *
      * @param globalSession the global session
      * @throws TransactionException the transaction exception
@@ -36,6 +38,7 @@ public interface SessionLifecycleListener {
 
     /**
      * On status change.
+     * 事务状态变更
      *
      * @param globalSession the global session
      * @param status        the status
@@ -45,7 +48,7 @@ public interface SessionLifecycleListener {
 
     /**
      * On branch status change.
-     *
+     * 分支事务状态变更
      * @param globalSession the global session
      * @param branchSession the branch session
      * @param status        the status
@@ -56,6 +59,7 @@ public interface SessionLifecycleListener {
 
     /**
      * On add branch.
+     * 添加分支事务
      *
      * @param globalSession the global session
      * @param branchSession the branch session
@@ -65,6 +69,7 @@ public interface SessionLifecycleListener {
 
     /**
      * On remove branch.
+     * 移除分支事务
      *
      * @param globalSession the global session
      * @param branchSession the branch session
@@ -74,6 +79,7 @@ public interface SessionLifecycleListener {
 
     /**
      * On close.
+     * 关闭事务
      *
      * @param globalSession the global session
      * @throws TransactionException the transaction exception
@@ -82,6 +88,7 @@ public interface SessionLifecycleListener {
 
     /**
      * On end.
+     * 事务结束
      *
      * @param globalSession the global session
      * @throws TransactionException the transaction exception

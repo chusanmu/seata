@@ -17,6 +17,7 @@ package io.seata.server.store;
 
 /**
  * The interface Session storable.
+ * TODO: session存储
  *
  * @author slievrly
  */

@@ -39,6 +39,17 @@ public class EnhancedServiceLoaderTest {
         Assertions.assertEquals(2, list.size());
     }
 
+    @Test
+    public void testLoadByArgs() {
+
+        LoaderTestSPI loader = EnhancedServiceLoader.load(LoaderTestSPI.class, "one");
+
+        LoaderTestSPI one = EnhancedServiceLoader.load(LoaderTestSPI.class, "one", new Object[]{"test"});
+
+        Assertions.assertEquals(loader, one);
+        Assertions.assertNotNull(one);
+    }
+
 
 }
 

@@ -19,6 +19,7 @@ import java.io.Serializable;
 
 /**
  * The type Register rm request.
+ * TODO: 注册RM的请求啊
  *
  * @author slievrly
  */

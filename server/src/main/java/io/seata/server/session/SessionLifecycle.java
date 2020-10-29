@@ -21,6 +21,7 @@ import io.seata.core.model.GlobalStatus;
 
 /**
  * The interface Session lifecycle.
+ * TODO: session的生命周期接口
  *
  * @author sharajava
  */

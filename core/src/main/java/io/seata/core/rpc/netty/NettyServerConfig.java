@@ -28,7 +28,7 @@ import static io.seata.common.DefaultValues.DEFAULT_SHUTDOWN_TIMEOUT_SEC;
 
 /**
  * The type Netty server config.
- *
+ * TODO: Netty server的配置类
  * @author slievrly
  */
 public class NettyServerConfig extends NettyBaseConfig {

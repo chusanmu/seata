@@ -21,6 +21,7 @@ import java.util.List;
 
 /**
  * The type Merged warp message.
+ * TODO: Merged 的消息啊，可能会把多条消息拧成一条消息，然后就是这个消息类型
  *
  * @author slievrly
  */

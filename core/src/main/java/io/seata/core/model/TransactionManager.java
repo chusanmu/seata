@@ -21,6 +21,7 @@ import io.seata.core.exception.TransactionException;
  * Transaction Manager.
  *
  * Define a global transaction and control it.
+ * TODO: 基本的事务管理器
  *
  * @author sharajava
  */
@@ -28,6 +29,7 @@ public interface TransactionManager {
 
     /**
      * Begin a new global transaction.
+     * 开启一个全局事务
      *
      * @param applicationId           ID of the application who begins this transaction.
      * @param transactionServiceGroup ID of the transaction service group.
@@ -42,6 +44,7 @@ public interface TransactionManager {
 
     /**
      * Global commit.
+     * 全局事务提交
      *
      * @param xid XID of the global transaction.
      * @return Status of the global transaction after committing.
@@ -52,6 +55,7 @@ public interface TransactionManager {
 
     /**
      * Global rollback.
+     * 全局事务回滚
      *
      * @param xid XID of the global transaction
      * @return Status of the global transaction after rollbacking.
@@ -62,6 +66,7 @@ public interface TransactionManager {
 
     /**
      * Get current status of the give transaction.
+     * 根据xid获得事务状态
      *
      * @param xid XID of the global transaction.
      * @return Current status of the global transaction.
@@ -72,6 +77,7 @@ public interface TransactionManager {
 
     /**
      * Global report.
+     * 全局事务上报
      *
      * @param xid XID of the global transaction.
      * @param globalStatus Status of the global transaction.

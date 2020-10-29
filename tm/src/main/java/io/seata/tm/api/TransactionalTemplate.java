@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Template of executing business logic with a global transaction.
- *
+ * TODO: 执行事务的一个模板
  * @author sharajava
  */
 public class TransactionalTemplate {
@@ -48,13 +48,15 @@ public class TransactionalTemplate {
      * @throws TransactionalExecutor.ExecutionException the execution exception
      */
     public Object execute(TransactionalExecutor business) throws Throwable {
-        // 1. Get transactionInfo
+        // 1 get transactionInfo
+        // TODO: 第一步，获得事务信息
         TransactionInfo txInfo = business.getTransactionInfo();
         if (txInfo == null) {
             throw new ShouldNeverHappenException("transactionInfo does not exist");
         }
-        // 1.1 Get current transaction, if not null, the tx role is 'GlobalTransactionRole.Participant'.
-        GlobalTransaction tx = GlobalTransactionContext.getCurrent();
+        // 1.1 get or create a transaction
+        // TODO: 然后获得或者创建一个全局事务
+        GlobalTransaction tx = GlobalTransactionContext.getCurrentOrCreate();
 
         // 1.2 Handle the transaction propagation.
         Propagation propagation = txInfo.getPropagation();

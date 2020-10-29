@@ -24,7 +24,7 @@ import static io.seata.core.constants.ConfigurationKeys.EXTRA_DATA_SPLIT_CHAR;
 
 /**
  * The type Register tm request.
- *
+ * 注册tm请求
  * @author slievrly
  */
 public class RegisterTMRequest extends AbstractIdentifyRequest implements Serializable {
