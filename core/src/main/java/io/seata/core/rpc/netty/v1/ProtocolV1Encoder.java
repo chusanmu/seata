@@ -71,6 +71,7 @@ public class ProtocolV1Encoder extends MessageToByteEncoder {
                 int headLength = ProtocolConstants.V1_HEAD_LENGTH;
 
                 byte messageType = rpcMessage.getMessageType();
+
                 out.writeBytes(ProtocolConstants.MAGIC_CODE_BYTES);
                 out.writeByte(ProtocolConstants.VERSION);
                 // full Length(4B) and head length(2B) will fix in the end. 

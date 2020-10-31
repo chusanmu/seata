@@ -90,10 +90,14 @@ public class ClientOnResponseProcessor implements RemotingProcessor {
 
     @Override
     public void process(ChannelHandlerContext ctx, RpcMessage rpcMessage) throws Exception {
+        // TODO: 如果返回的结果类型是 MergeResultMessage类型，表示是一个merge的消息类型
         if (rpcMessage.getBody() instanceof MergeResultMessage) {
+            // TODO: 结果转成MergeResultMessage
             MergeResultMessage results = (MergeResultMessage) rpcMessage.getBody();
+            // TODO: 把发送的消息拿到
             MergedWarpMessage mergeMessage = (MergedWarpMessage) mergeMsgMap.remove(rpcMessage.getId());
             for (int i = 0; i < mergeMessage.msgs.size(); i++) {
+                // TODO: 把这个mergeMessage里面的msg全部取出来
                 int msgId = mergeMessage.msgIds.get(i);
                 MessageFuture future = futures.remove(msgId);
                 if (future == null) {
@@ -101,11 +105,14 @@ public class ClientOnResponseProcessor implements RemotingProcessor {
                         LOGGER.info("msg: {} is not found in futures.", msgId);
                     }
                 } else {
+                    // TODO: 把result里面的结果设置到future中
                     future.setResultMessage(results.getMsgs()[i]);
                 }
             }
         } else {
+            // TODO: 表示是单个消息，把messageFuture取出来
             MessageFuture messageFuture = futures.remove(rpcMessage.getId());
+            // TODO: 设置结果
             if (messageFuture != null) {
                 messageFuture.setResultMessage(rpcMessage.getBody());
             } else {

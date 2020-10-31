@@ -18,6 +18,7 @@ package io.seata.common.thread;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * TODO: 保证生成的int数 一直能是正数
  * positive atomic counter, begin with 0, ensure the number is positive.
  *
  * @author Geng Zhang
@@ -30,6 +31,11 @@ public class PositiveAtomicCounter {
         atom = new AtomicInteger(0);
     }
 
+    /**
+     * 加到最大值 之后 又从0开始了
+     *
+     * @return
+     */
     public final int incrementAndGet() {
         return atom.incrementAndGet() & MASK;
     }

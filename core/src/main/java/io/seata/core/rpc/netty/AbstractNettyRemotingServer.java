@@ -47,17 +47,22 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractNettyRemotingServer.class);
 
+    /**
+     * TODO: 组合了nettyServerBootstrap
+     */
     private final NettyServerBootstrap serverBootstrap;
 
     @Override
     public void init() {
         super.init();
+        // TODO: 启动serverBootstrap，会监听端口号 启动服务
         serverBootstrap.start();
     }
 
     public AbstractNettyRemotingServer(ThreadPoolExecutor messageExecutor, NettyServerConfig nettyServerConfig) {
         super(messageExecutor);
         serverBootstrap = new NettyServerBootstrap(nettyServerConfig);
+        // TODO: 设置serverHandler
         serverBootstrap.setChannelHandlers(new ServerHandler());
     }
 
@@ -105,6 +110,12 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
         }
     }
 
+    /**
+     * 注册 processor
+     * @param messageType {@link io.seata.core.protocol.MessageType}
+     * @param processor   {@link RemotingProcessor}
+     * @param executor    thread pool
+     */
     @Override
     public void registerProcessor(int messageType, RemotingProcessor processor, ExecutorService executor) {
         Pair<RemotingProcessor, ExecutorService> pair = new Pair<>(processor, executor);
@@ -155,6 +166,7 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
     }
 
     /**
+     * 服务端 handler处理器
      * The type ServerHandler.
      */
     @ChannelHandler.Sharable
@@ -162,6 +174,7 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
 
         /**
          * Channel read.
+         * TODO: 用以监听读事件
          *
          * @param ctx the ctx
          * @param msg the msg
@@ -169,15 +182,18 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
          */
         @Override
         public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
+            // TODO: 如果不是rpcMessage ，那就啥事都不干
             if (!(msg instanceof RpcMessage)) {
                 return;
             }
+            // TODO: 利用此方法去分发处理不同的请求
             processMessage(ctx, (RpcMessage) msg);
         }
 
         @Override
         public void channelWritabilityChanged(ChannelHandlerContext ctx) {
             synchronized (lock) {
+                // TODO: 判断当前这个channel是否可写了，如果可写了，立刻唤醒所有等待在这个lock上的线程
                 if (ctx.channel().isWritable()) {
                     lock.notifyAll();
                 }
@@ -203,6 +219,7 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
 
         private void handleDisconnect(ChannelHandlerContext ctx) {
             final String ipAndPort = NetUtil.toStringAddress(ctx.channel().remoteAddress());
+            // TODO: 获取rpcContext然后释放掉
             RpcContext rpcContext = ChannelManager.getContextFromIdentified(ctx.channel());
             if (LOGGER.isInfoEnabled()) {
                 LOGGER.info(ipAndPort + " to server channel inactive.");
@@ -231,6 +248,7 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
             if (LOGGER.isInfoEnabled()) {
                 LOGGER.info("channel exx:" + cause.getMessage() + ",channel:" + ctx.channel());
             }
+            // TODO: 释放rpcContext
             ChannelManager.releaseRpcContext(ctx.channel());
             super.exceptionCaught(ctx, cause);
         }
@@ -247,12 +265,15 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
             if (evt instanceof IdleStateEvent) {
                 debugLog("idle:" + evt);
                 IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
+                // TODO: 如果出现了读空闲，则表示客户端没有定时的发 PING消息
                 if (idleStateEvent.state() == IdleState.READER_IDLE) {
                     if (LOGGER.isInfoEnabled()) {
                         LOGGER.info("channel:" + ctx.channel() + " read idle.");
                     }
+                    // TODO: 释放RpcContext
                     handleDisconnect(ctx);
                     try {
+                        // TODO: 关闭这个channel
                         closeChannelHandlerContext(ctx);
                     } catch (Exception e) {
                         LOGGER.error(e.getMessage());

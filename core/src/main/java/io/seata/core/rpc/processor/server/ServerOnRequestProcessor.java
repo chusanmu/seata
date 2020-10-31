@@ -109,6 +109,7 @@ public class ServerOnRequestProcessor implements RemotingProcessor {
         if (!(message instanceof AbstractMessage)) {
             return;
         }
+        // TODO: 把mergeMessage拆出来单独处理
         if (message instanceof MergedWarpMessage) {
             AbstractResultMessage[] results = new AbstractResultMessage[((MergedWarpMessage) message).msgs.size()];
             for (int i = 0; i < results.length; i++) {

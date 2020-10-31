@@ -68,11 +68,14 @@ public abstract class AbstractNettyRemoting implements Disposable {
     protected final ThreadPoolExecutor messageExecutor;
 
     /**
+     * TODO: id 生成器，可以恒定生成正数
      * Id generator of this remoting
      */
     protected final PositiveAtomicCounter idGenerator = new PositiveAtomicCounter();
 
     /**
+     * TODO: 通过messageFuture 阻塞来获取结果
+     * 
      * Obtain the return result through MessageFuture blocking.
      *
      * @see AbstractNettyRemoting#sendSync
@@ -100,12 +103,16 @@ public abstract class AbstractNettyRemoting implements Disposable {
     protected final HashMap<Integer/*MessageType*/, Pair<RemotingProcessor, ExecutorService>> processorTable = new HashMap<>(32);
 
     public void init() {
+        // TODO: 定时器，用于定时future中超时的请求
         timerExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
                 for (Map.Entry<Integer, MessageFuture> entry : futures.entrySet()) {
+                    // TODO: 如果这个future已经超时了
                     if (entry.getValue().isTimeout()) {
+                        // TODO: 就把它从futures中移除
                         futures.remove(entry.getKey());
+                        // TODO: 同时将future的 resultMessage设置为null
                         entry.getValue().setResultMessage(null);
                         if (LOGGER.isDebugEnabled()) {
                             LOGGER.debug("timeout clear future: {}", entry.getValue().getRequestMessage().getBody());
@@ -122,6 +129,11 @@ public abstract class AbstractNettyRemoting implements Disposable {
         this.messageExecutor = messageExecutor;
     }
 
+    /**
+     * 生成消息ID
+     *
+     * @return
+     */
     public int getNextMessageId() {
         return idGenerator.incrementAndGet();
     }
@@ -142,6 +154,9 @@ public abstract class AbstractNettyRemoting implements Disposable {
         destroyChannel(getAddressFromChannel(channel), channel);
     }
 
+    /**
+     * TODO: 把两个线程池 shutdown();
+     */
     @Override
     public void destroy() {
         timerExecutor.shutdown();
@@ -149,6 +164,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
     }
 
     /**
+     * 发起 rpc 同步请求
      * rpc sync request
      * Obtain the return result through MessageFuture blocking.
      *
@@ -159,6 +175,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
      * @throws TimeoutException
      */
     protected Object sendSync(Channel channel, RpcMessage rpcMessage, long timeoutMillis) throws TimeoutException {
+        // TODO: 校验参数的合法性
         if (timeoutMillis <= 0) {
             throw new FrameworkException("timeout should more than 0ms");
         }
@@ -167,24 +184,30 @@ public abstract class AbstractNettyRemoting implements Disposable {
             return null;
         }
 
+        // TODO: 构建响应 messageFuture
         MessageFuture messageFuture = new MessageFuture();
         messageFuture.setRequestMessage(rpcMessage);
         messageFuture.setTimeout(timeoutMillis);
         futures.put(rpcMessage.getId(), messageFuture);
 
+        // TODO: 校验当前channel是否可写
         channelWritableCheck(channel, rpcMessage.getBody());
 
         channel.writeAndFlush(rpcMessage).addListener((ChannelFutureListener) future -> {
+            // TODO: 如果future没有成功
             if (!future.isSuccess()) {
+                // TODO: 把future 取出来 把结果设置成 future.cause(), 然后销毁channel
                 MessageFuture messageFuture1 = futures.remove(rpcMessage.getId());
                 if (messageFuture1 != null) {
                     messageFuture1.setResultMessage(future.cause());
                 }
+                // TODO: 销毁channel
                 destroyChannel(future.channel());
             }
         });
 
         try {
+            // TODO: 从future中取出结果 返回回去
             return messageFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
         } catch (Exception exx) {
             LOGGER.error("wait response error:{},ip:{},request:{}", exx.getMessage(), channel.remoteAddress(),
@@ -199,16 +222,19 @@ public abstract class AbstractNettyRemoting implements Disposable {
 
     /**
      * rpc async request.
+     * 发起一个异步请求
      *
      * @param channel    netty channel
      * @param rpcMessage rpc message
      */
     protected void sendAsync(Channel channel, RpcMessage rpcMessage) {
+        // TODO: 检测当前channel是否可写
         channelWritableCheck(channel, rpcMessage.getBody());
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("write message:" + rpcMessage.getBody() + ", channel:" + channel + ",active?"
                 + channel.isActive() + ",writable?" + channel.isWritable() + ",isopen?" + channel.isOpen());
         }
+        // TODO: 写出消息，如果失败了，就销毁这个channel
         channel.writeAndFlush(rpcMessage).addListener((ChannelFutureListener) future -> {
             if (!future.isSuccess()) {
                 destroyChannel(future.channel());
@@ -216,6 +242,13 @@ public abstract class AbstractNettyRemoting implements Disposable {
         });
     }
 
+    /**
+     * 构建 request message
+     *
+     * @param msg
+     * @param messageType
+     * @return
+     */
     protected RpcMessage buildRequestMessage(Object msg, byte messageType) {
         RpcMessage rpcMessage = new RpcMessage();
         rpcMessage.setId(getNextMessageId());
@@ -226,6 +259,14 @@ public abstract class AbstractNettyRemoting implements Disposable {
         return rpcMessage;
     }
 
+    /**
+     * 构建 响应消息
+     *
+     * @param rpcMessage
+     * @param msg
+     * @param messageType
+     * @return
+     */
     protected RpcMessage buildResponseMessage(RpcMessage rpcMessage, Object msg, byte messageType) {
         RpcMessage rpcMsg = new RpcMessage();
         rpcMsg.setMessageType(messageType);
@@ -242,6 +283,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
     boolean allowDumpStack = false;
 
     /**
+     * TODO: 核心方法
      * Rpc message processing.
      *
      * @param ctx        Channel handler context.
@@ -253,13 +295,18 @@ public abstract class AbstractNettyRemoting implements Disposable {
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(String.format("%s msgId:%s, body:%s", this, rpcMessage.getId(), rpcMessage.getBody()));
         }
+        // TODO: 把消息体拿过来， 获取messageType
         Object body = rpcMessage.getBody();
         if (body instanceof MessageTypeAware) {
+            // TODO: 转成messageTypeAware
             MessageTypeAware messageTypeAware = (MessageTypeAware) body;
+            // TODO: 从processorTable中获取可以处理此消息的 pair(消息处理器，执行线程池)
             final Pair<RemotingProcessor, ExecutorService> pair = this.processorTable.get((int) messageTypeAware.getTypeCode());
             if (pair != null) {
+                // TODO: 当前的消息 存在pair, 可以被处理，存在执行它的线程池
                 if (pair.getSecond() != null) {
                     try {
+                        // TODO: 利用此处理器的线程池去处理
                         pair.getSecond().execute(() -> {
                             try {
                                 pair.getFirst().process(ctx, rpcMessage);
@@ -267,6 +314,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
                                 LOGGER.error(FrameworkErrorCode.NetDispatch.getErrCode(), th.getMessage(), th);
                             }
                         });
+                        // TODO: 当线程池满的时候，可以进行dump当前线程池 来排查问题
                     } catch (RejectedExecutionException e) {
                         LOGGER.error(FrameworkErrorCode.ThreadPoolFull.getErrCode(),
                             "thread pool is full, current max pool size is " + messageExecutor.getActiveCount());
@@ -283,6 +331,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
                         }
                     }
                 } else {
+                    // TODO: 没有线程池，则直接利用当前线程去执行了
                     try {
                         pair.getFirst().process(ctx, rpcMessage);
                     } catch (Throwable th) {
@@ -316,12 +365,19 @@ public abstract class AbstractNettyRemoting implements Disposable {
     protected String getAddressFromChannel(Channel channel) {
         SocketAddress socketAddress = channel.remoteAddress();
         String address = socketAddress.toString();
+        // TODO: 把开头的 / 去掉
         if (socketAddress.toString().indexOf(NettyClientConfig.getSocketAddressStartChar()) == 0) {
             address = socketAddress.toString().substring(NettyClientConfig.getSocketAddressStartChar().length());
         }
         return address;
     }
 
+    /**
+     * TODO: 检查当前channel是否可写
+     *
+     * @param channel
+     * @param msg
+     */
     private void channelWritableCheck(Channel channel, Object msg) {
         int tryTimes = 0;
         synchronized (lock) {

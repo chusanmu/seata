@@ -19,6 +19,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.seata.core.protocol.RpcMessage;
 
 /**
+ * TODO: netty 接收消息 处理器，接收到消息后，基于此RemotingProcessor去处理消息
  * The remoting processor
  * <p>
  * Used to encapsulate remote interaction logic.

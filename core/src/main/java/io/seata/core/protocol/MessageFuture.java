@@ -28,12 +28,27 @@ import java.util.concurrent.TimeoutException;
  * @author slievrly
  */
 public class MessageFuture {
+    /**
+     * 对应的 rpc消息
+     */
     private RpcMessage requestMessage;
+    /**
+     * 超时时间
+     */
     private long timeout;
+
+    /**
+     * 开始时间
+     */
     private long start = System.currentTimeMillis();
+
+    /**
+     * 用来存放执行结果
+     */
     private transient CompletableFuture<Object> origin = new CompletableFuture<>();
 
     /**
+     * TODO：判断是否超时了
      * Is timeout boolean.
      *
      * @return the boolean
@@ -43,6 +58,8 @@ public class MessageFuture {
     }
 
     /**
+     * TODO: 这个很重要，获取执行结果, 这个方法依赖completableFuture，它是阻塞的
+     *
      * Get object.
      *
      * @param timeout the timeout
@@ -55,6 +72,7 @@ public class MessageFuture {
         InterruptedException {
         Object result = null;
         try {
+            // TODO: 获取结果
             result = origin.get(timeout, unit);
         } catch (ExecutionException e) {
             throw new ShouldNeverHappenException("Should not get results in a multi-threaded environment", e);
@@ -62,12 +80,15 @@ public class MessageFuture {
             throw new TimeoutException("cost " + (System.currentTimeMillis() - start) + " ms");
         }
 
+        // TODO: 看看结果是否是个runtimeException，如果是个异常，直接就抛出
         if (result instanceof RuntimeException) {
             throw (RuntimeException)result;
         } else if (result instanceof Throwable) {
+            // TODO: 如果是throwable类型的异常 也包成runtimeException返回回去
             throw new RuntimeException((Throwable)result);
         }
 
+        // TODO: 最后把结果返回回去
         return result;
     }
 
