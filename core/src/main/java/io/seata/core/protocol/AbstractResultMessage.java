@@ -17,11 +17,15 @@ package io.seata.core.protocol;
 
 /**
  * The type Abstract result message.
+ * TOOD: 抽象的响应消息
  *
  * @author slievrly
  */
 public abstract class AbstractResultMessage extends AbstractMessage  {
 
+    /**
+     * 响应码
+     */
     private ResultCode resultCode;
 
     private String msg;

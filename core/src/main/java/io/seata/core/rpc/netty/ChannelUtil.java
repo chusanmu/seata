@@ -60,10 +60,11 @@ public class ChannelUtil {
      * get client port from channel
      * @param channel the channel
      * @return client port
+     * 从channel 中取出来客户端port
      */
     public static Integer getClientPortFromChannel(Channel channel) {
         String address = getAddressFromChannel(channel);
-        Integer port = 0;
+        int port = 0;
         try {
             if (address.contains(Constants.IP_PORT_SPLIT_CHAR)) {
                 port = Integer.parseInt(address.substring(address.lastIndexOf(Constants.IP_PORT_SPLIT_CHAR) + 1));

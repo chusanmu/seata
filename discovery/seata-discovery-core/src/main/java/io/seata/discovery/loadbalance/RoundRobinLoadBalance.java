@@ -22,6 +22,7 @@ import io.seata.common.loader.LoadLevel;
 
 /**
  * The type Round robin load balance.
+ * TODO: 轮询算法，优先级也比较高
  *
  * @author slievrly
  */
@@ -33,7 +34,18 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
     @Override
     protected <T> T doSelect(List<T> invokers, String xid) {
         int length = invokers.size();
-        return invokers.get(getPositiveSequence() % length);
+        // TODO: seata优化点，这地方可以进行一个优化，如果 getPositiveSequence() 是2的幂，可以直接进行位运算
+        int positiveSequence = getPositiveSequence();
+
+        if (isPowerOfTwo(length)) {
+            return invokers.get(positiveSequence & (length - 1));
+        } else {
+            return invokers.get(positiveSequence % length);
+        }
+    }
+
+    private static boolean isPowerOfTwo(int val) {
+        return (val & -val) == val;
     }
 
     private int getPositiveSequence() {

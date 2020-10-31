@@ -17,6 +17,7 @@ package io.seata.core.serializer;
 
 /**
  * The interface Codec.
+ * 序列化接口
  *
  * @author zhangsen
  */
@@ -28,6 +29,7 @@ public interface Serializer {
      * @param <T> the type parameter
      * @param t   the t
      * @return the byte [ ]
+     * 序列化，对象转字节
      */
     <T> byte[] serialize(T t);
 
@@ -37,6 +39,7 @@ public interface Serializer {
      * @param <T>   the type parameter
      * @param bytes the bytes
      * @return the t
+     * 字节转成对象
      */
     <T> T deserialize(byte[] bytes);
 }

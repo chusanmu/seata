@@ -38,8 +38,9 @@ public class Version {
 
     /**
      * The constant VERSION_MAP.
+     * 存储 remoteAddress -> version
      */
-    public static final Map<String, String> VERSION_MAP = new ConcurrentHashMap<String, String>();
+    public static final Map<String, String> VERSION_MAP = new ConcurrentHashMap<>();
 
     private Version() {
 

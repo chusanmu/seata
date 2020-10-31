@@ -17,7 +17,7 @@ package io.seata.core.protocol;
 
 /**
  * The interface Merge message.
- *
+ * 一个标记接口，表示消息类型是否为merge类型的，多条消息聚合的
  * @author slievrly
  */
 public interface MergeMessage {

@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The type Abstract tc inbound handler.
- *
+ * TODO: TC处理器
  * @author sharajava
  */
 public abstract class AbstractTCInboundHandler extends AbstractExceptionHandler implements TCInboundHandler {

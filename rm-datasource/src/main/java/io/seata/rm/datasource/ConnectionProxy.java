@@ -177,6 +177,10 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         context.appendLockKey(lockKey);
     }
 
+    /**
+     * TODO: 重写提交事务方法
+     * @throws SQLException
+     */
     @Override
     public void commit() throws SQLException {
         try {
@@ -185,6 +189,9 @@ public class ConnectionProxy extends AbstractConnectionProxy {
                 return null;
             });
         } catch (SQLException e) {
+            if (targetConnection != null && !getAutoCommit()) {
+                rollback();
+            }
             throw e;
         } catch (Exception e) {
             throw new SQLException(e);
@@ -192,6 +199,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     }
 
     private void doCommit() throws SQLException {
+        // TODO: 如果当前上下文环境中存在xid，表示存在全局事务，则当前事务commit的时候，就进行注册分支
         if (context.inGlobalTransaction()) {
             processGlobalTransactionCommit();
         } else if (context.isGlobalLockRequire()) {
@@ -213,6 +221,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     private void processGlobalTransactionCommit() throws SQLException {
         try {
+            // TODO: resourceManager 注册分支事务
             register();
         } catch (TransactionException e) {
             recognizeLockKeyConflictException(e, context.buildLockKeys());
@@ -232,9 +241,11 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     }
 
     private void register() throws TransactionException {
+        // TODO: 如果buffer中不为空，表示注册完了，直接返回就好了
         if (!context.hasUndoLog() || context.getLockKeysBuffer().isEmpty()) {
             return;
         }
+        // TODO: 这时候就进行去注册分支事务，向TC发起请求
         Long branchId = DefaultResourceManager.get().branchRegister(BranchType.AT, getDataSourceProxy().getResourceId(),
             null, context.getXid(), null, context.buildLockKeys());
         context.setBranchId(branchId);
@@ -251,7 +262,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     @Override
     public void setAutoCommit(boolean autoCommit) throws SQLException {
-        if (autoCommit && !getAutoCommit()) {
+        if ((context.inGlobalTransaction() || context.isGlobalLockRequire()) && autoCommit && !getAutoCommit()) {
             // change autocommit from false to true, we should commit() first according to JDBC spec.
             doCommit();
         }

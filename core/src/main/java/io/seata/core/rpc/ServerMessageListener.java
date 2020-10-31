@@ -20,6 +20,7 @@ import io.seata.core.protocol.RpcMessage;
 
 /**
  * The interface Server message listener.
+ * TODO 服务消息监听器, 当TC收到消息监听的时候，触发响应的事件
  *
  * @author slievrly
  */
@@ -36,7 +37,7 @@ public interface ServerMessageListener {
 
     /**
      * On reg rm message.
-     *
+     *  TODO: 当RM过来注册的时候，触发此事件
      * @param request          the msg id
      * @param ctx              the ctx
      * @param checkAuthHandler the check auth handler
@@ -45,7 +46,7 @@ public interface ServerMessageListener {
 
     /**
      * On reg tm message.
-     *
+     * TODO: 当TM过来注册的时候，触发此事件
      * @param request          the msg id
      * @param ctx              the ctx
      * @param checkAuthHandler the check auth handler

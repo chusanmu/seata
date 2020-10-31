@@ -18,7 +18,7 @@ package io.seata.core.protocol;
 
 /**
  * The type Merge result message.
- *
+ *  TODO: 这是merge消息的 响应消息
  * @author slievrly
  */
 public class MergeResultMessage extends AbstractMessage implements MergeMessage {

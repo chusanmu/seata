@@ -130,10 +130,12 @@ public class FileSessionManager extends AbstractSessionManager implements Reload
     @Override
     public <T> T lockAndExecute(GlobalSession globalSession, GlobalSession.LockCallable<T> lockCallable)
             throws TransactionException {
+        // TODO: session 加锁
         globalSession.lock();
         try {
             return lockCallable.call();
         } finally {
+            // TODO: session释放锁
             globalSession.unlock();
         }
     }

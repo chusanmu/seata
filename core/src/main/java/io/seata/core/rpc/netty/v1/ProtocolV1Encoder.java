@@ -18,12 +18,13 @@ package io.seata.core.rpc.netty.v1;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
+import io.seata.common.loader.EnhancedServiceLoader;
 import io.seata.core.serializer.Serializer;
-import io.seata.core.serializer.SerializerFactory;
 import io.seata.core.compressor.Compressor;
 import io.seata.core.compressor.CompressorFactory;
 import io.seata.core.protocol.ProtocolConstants;
 import io.seata.core.protocol.RpcMessage;
+import io.seata.core.serializer.SerializerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,10 +89,11 @@ public class ProtocolV1Encoder extends MessageToByteEncoder {
                 }
 
                 byte[] bodyBytes = null;
+                // TODO: 如果消息类型不是心跳请求 也不是 心跳响应，则解析body
                 if (messageType != ProtocolConstants.MSGTYPE_HEARTBEAT_REQUEST
                         && messageType != ProtocolConstants.MSGTYPE_HEARTBEAT_RESPONSE) {
                     // heartbeat has no body
-                    Serializer serializer = SerializerFactory.getSerializer(rpcMessage.getCodec());
+                    Serializer serializer = EnhancedServiceLoader.load(Serializer.class, SerializerType.getByCode(rpcMessage.getCodec()).name());
                     bodyBytes = serializer.serialize(rpcMessage.getBody());
                     Compressor compressor = CompressorFactory.getCompressor(rpcMessage.getCompressor());
                     bodyBytes = compressor.compress(bodyBytes);
@@ -103,11 +105,13 @@ public class ProtocolV1Encoder extends MessageToByteEncoder {
                 }
 
                 // fix fullLength and headLength
+                // TODO: 这地方的意思就是，刚开始不能确定数据包总长度，所以fullLength是个空位，然后这地方移动指针，重新设置填充fullLength
                 int writeIndex = out.writerIndex();
                 // skip magic code(2B) + version(1B)
                 out.writerIndex(writeIndex - fullLength + 3);
                 out.writeInt(fullLength);
                 out.writeShort(headLength);
+                // TODO: 填充完毕，再把writeIndex放回去
                 out.writerIndex(writeIndex);
             } else {
                 throw new UnsupportedOperationException("Not support this class:" + msg.getClass());

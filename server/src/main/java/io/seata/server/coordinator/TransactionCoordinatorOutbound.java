@@ -22,7 +22,7 @@ import io.seata.server.session.GlobalSession;
 
 /**
  * send outbound request to RM.
- *
+ *  向RM发起出站请求
  * @author zhangchenghui.dev@gmail.com
  * @since 1.1.0
  */
@@ -30,6 +30,7 @@ public interface TransactionCoordinatorOutbound {
 
     /**
      * Commit a branch transaction.
+     * 提交分支事务 请求
      *
      * @param globalSession the global session
      * @param branchSession the branch session
@@ -41,6 +42,7 @@ public interface TransactionCoordinatorOutbound {
 
     /**
      * Rollback a branch transaction.
+     * 回滚分支事务
      *
      * @param globalSession the global session
      * @param branchSession the branch session
